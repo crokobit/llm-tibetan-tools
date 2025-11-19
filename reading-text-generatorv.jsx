@@ -266,7 +266,35 @@ const AnalysisLabel = ({ text, isSub }) => {
   return <div className={`text-gray-600 ${isSub ? 'text-xs' : 'text-sm'} font-medium`}>{text}</div>
 }
 
-const WordCard = ({ unit, onClick, isNested = false, indices }) => {
+const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset) => {
+  const textStart = currentGlobalOffset;
+  const textEnd = currentGlobalOffset + text.length;
+
+  // Intersection of [textStart, textEnd) and [startGlobal, endGlobal)
+  const highlightStart = Math.max(textStart, startGlobal);
+  const highlightEnd = Math.min(textEnd, endGlobal);
+
+  if (highlightStart >= highlightEnd) {
+    return text;
+  }
+
+  const relStart = highlightStart - textStart;
+  const relEnd = highlightEnd - textStart;
+
+  const before = text.substring(0, relStart);
+  const mid = text.substring(relStart, relEnd);
+  const after = text.substring(relEnd);
+
+  return (
+    <>
+      {before}
+      <span className="bg-green-200 rounded-sm">{mid}</span>
+      {after}
+    </>
+  );
+};
+
+const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) => {
   const { analysis, original, nestedData, supplementaryData } = unit;
   const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
 
@@ -274,15 +302,24 @@ const WordCard = ({ unit, onClick, isNested = false, indices }) => {
   const mainBorderColor = POS_COLORS[mainPosKey] || POS_COLORS.other;
   const displayDef = truncateDefinition(analysis.definition);
 
+  // Check if this unit is the target of the current creation action
+  const isEditingTarget = editingTarget &&
+    editingTarget.indices.blockIdx === indices.blockIdx &&
+    editingTarget.indices.lineIdx === indices.lineIdx &&
+    editingTarget.indices.unitIdx === indices.unitIdx;
+
+  const isCreatingSub = isEditingTarget && editingTarget.isCreating;
+
   // --- Compound Mode Logic (Grid Layout) ---
   const subUnits = (nestedData && nestedData.length > 0) ? nestedData : (supplementaryData && supplementaryData.length > 0 ? supplementaryData : null);
   const subType = nestedData && nestedData.length > 0 ? 'nested' : 'supplementary';
 
   if (subUnits) {
+    let currentGlobalOffset = 0; // Track offset for highlighting
     return (
       <div
         data-indices={indices ? JSON.stringify(indices) : undefined}
-        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${hoveredSubIndex === null ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
+        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${hoveredSubIndex === null && !isCreatingSub ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
         onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
@@ -291,6 +328,8 @@ const WordCard = ({ unit, onClick, isNested = false, indices }) => {
         {subUnits.map((u, i) => {
           // Check if this sub-unit is just a tsheg
           const isTsheg = u.original.trim() === '་';
+          const myOffset = currentGlobalOffset;
+          currentGlobalOffset += u.original.length;
 
           return (
             <div
@@ -305,7 +344,16 @@ const WordCard = ({ unit, onClick, isNested = false, indices }) => {
                 }
               }}
             >
-              <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>{u.original}</span>
+              <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
+                {isCreatingSub && editingTarget.creationDetails
+                  ? renderHighlightedText(
+                    u.original,
+                    editingTarget.creationDetails.startOffset,
+                    editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+                    myOffset
+                  )
+                  : u.original}
+              </span>
             </div>
           );
         })}
@@ -383,8 +431,17 @@ const WordCard = ({ unit, onClick, isNested = false, indices }) => {
       }}
     >
       {/* Main Tibetan Word */}
-      <div className={`px-1 ${borderClass} group-hover:bg-blue-50 rounded-t transition-colors`}>
-        <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>{original}</span>
+      <div className={`px-1 ${borderClass} ${!isCreatingSub ? 'group-hover:bg-blue-50' : ''} rounded-t transition-colors`}>
+        <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
+          {isCreatingSub && editingTarget.creationDetails
+            ? renderHighlightedText(
+              original,
+              editingTarget.creationDetails.startOffset,
+              editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+              0
+            )
+            : original}
+        </span>
       </div>
 
       {/* Main Analysis */}
@@ -399,7 +456,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices }) => {
   );
 };
 
-const UnitRenderer = ({ unit, indices, onClick, isNested }) => {
+const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget }) => {
   if (unit.type === 'text') {
     return (
       <span
@@ -411,10 +468,10 @@ const UnitRenderer = ({ unit, indices, onClick, isNested }) => {
       </span>
     );
   }
-  return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} />;
+  return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} />;
 };
 
-const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick }) => {
+const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick, editingTarget }) => {
   return (
     <div className="my-6 leading-relaxed text-justify">
       {line.units.map((unit, unitIdx) => (
@@ -423,6 +480,7 @@ const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick }) => {
           unit={unit}
           indices={{ blockIdx, lineIdx, unitIdx }}
           onClick={(e, subUnit, subIndex, subType) => onUnitClick(e, blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType)}
+          editingTarget={editingTarget}
         />
       ))}
     </div>
@@ -600,8 +658,8 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
       ></div>
 
       <div className="p-3 space-y-2">
-        {/* Parent Selection Dropdown */}
-        {isCreating && possibleParents && possibleParents.length > 1 && (
+        {/* Parent Selection Dropdown - Hidden for now */}
+        {false && isCreating && possibleParents && possibleParents.length > 1 && (
           <div className="mb-2">
             <label className="block text-xs text-gray-500 mb-1">Add Analysis To:</label>
             <select
@@ -773,6 +831,9 @@ export default function TibetanReader() {
 
     // Check for overlaps with word units
     let exactMatchUnit = null;
+    let exactMatchSubUnit = null;
+    let exactMatchSubIndex = null;
+    let exactMatchSubType = null;
     let candidateParent = null;
 
     for (let i = startUnitIdx; i <= endUnitIdx; i++) {
@@ -783,6 +844,32 @@ export default function TibetanReader() {
         // If selection is fully contained in one word, that word is a candidate parent
         if (startUnitIdx === endUnitIdx) {
           candidateParent = lineUnits[i];
+
+          // Check if the selection matches any existing sub-analysis
+          if (candidateParent.nestedData && candidateParent.nestedData.length > 0) {
+            for (let j = 0; j < candidateParent.nestedData.length; j++) {
+              const subUnit = candidateParent.nestedData[j];
+              if (subUnit.type === 'word' && subUnit.original === selectedText) {
+                exactMatchSubUnit = subUnit;
+                exactMatchSubIndex = j;
+                exactMatchSubType = 'nested';
+                break;
+              }
+            }
+          }
+
+          // Also check supplementaryData if needed
+          if (!exactMatchSubUnit && candidateParent.supplementaryData && candidateParent.supplementaryData.length > 0) {
+            for (let j = 0; j < candidateParent.supplementaryData.length; j++) {
+              const subUnit = candidateParent.supplementaryData[j];
+              if (subUnit.type === 'word' && subUnit.original === selectedText) {
+                exactMatchSubUnit = subUnit;
+                exactMatchSubIndex = j;
+                exactMatchSubType = 'supplementary';
+                break;
+              }
+            }
+          }
         }
       }
     }
@@ -790,7 +877,20 @@ export default function TibetanReader() {
     const rect = range.getBoundingClientRect();
     setAnchorRect(rect);
 
-    // Case 1: Exact match -> Edit
+    // Case 1a: Exact match with sub-analysis -> Edit the sub-analysis
+    if (exactMatchSubUnit) {
+      setEditingTarget({
+        indices: { blockIdx, lineIdx, unitIdx: startUnitIdx, subIndex: exactMatchSubIndex, subType: exactMatchSubType },
+        data: exactMatchSubUnit,
+        isCreating: false
+      });
+      selection.removeAllRanges();
+      ignoreClickRef.current = true;
+      setTimeout(() => { ignoreClickRef.current = false; }, 300);
+      return;
+    }
+
+    // Case 1b: Exact match -> Edit
     if (exactMatchUnit) {
       setEditingTarget({
         indices: { blockIdx, lineIdx, unitIdx: startUnitIdx },
@@ -1046,6 +1146,7 @@ export default function TibetanReader() {
                   blockIdx={bIdx}
                   lineIdx={lIdx}
                   onUnitClick={handleUnitClick}
+                  editingTarget={editingTarget}
                 />
               ))}
             </div>
