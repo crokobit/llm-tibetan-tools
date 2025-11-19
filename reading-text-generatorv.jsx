@@ -5,13 +5,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 // ==========================================
 
 class RegexGrammar {
-  static BLOCK = />>>\s*(.*?)\s*(?:>>>>\s*(.*?)\s*)?>>>>>/sg;
-  static SUPPLEMENTARY_LINE = /^([^\s\[]+)\s*\[(.*)\]/;
-  static UNIT_SPLIT = /(<[^>]+>\[.*?\])|(།|་|[^<།་]+)/g;
-  static ANALYZED_WORD = /<([^>]+)>\[(.*)\]/;
+  // Matches the entire block: >>> Raw Text >>>> Analysis >>>>>
+  static BLOCK = />>>\s*([\s\S]*?)\s*>>>>\s*([\s\S]*?)\s*>>>>>/g;
+
+  // Matches a single analysis line: tabs, <original>, [analysis]
+  // Captures: 1=tabs, 2=original, 3=analysis_content
+  static ANALYSIS_LINE = /^(\t*)<([^>]+)>\[(.*)\]\s*$/;
+
+  // Matches the internal analysis content: A{B1,Bh, B2}C D
+  // A = volls (optional), { ... } = pos/tense, C D = root/definition
   static ANALYSIS_CONTENT = /^(.*?){([a-z0-9/\->|]+)(?:,([^}]+))?}(.*)$/i;
-  static NESTED_BLOCK = /^\[(<.*)\]$/;
-  static BRACKET_CONTENT = /\[([^\[\]]+)\]$/;
 }
 
 // ==========================================
@@ -21,10 +24,9 @@ class RegexGrammar {
 class AnalysisParser {
   static parse(annotationString) {
     let content = annotationString;
-    const lastMatch = content.match(RegexGrammar.BRACKET_CONTENT);
-    if (lastMatch) {
-      content = lastMatch[1];
-    } else if (content.startsWith('[') && content.endsWith(']')) {
+
+    // Handle potential double bracketing if it exists, though regex should handle it
+    if (content.startsWith('[') && content.endsWith(']')) {
       content = content.substring(1, content.length - 1);
     }
 
@@ -40,6 +42,8 @@ class AnalysisParser {
       tense = match[3] || '';
       let rest = match[4].trim();
 
+      // Attempt to separate Root from Definition
+      // Assuming Root is Tibetan characters at the start
       const tibetanWordMatch = rest.match(/^([\u0F00-\u0FFF]+)/);
       if (tibetanWordMatch) {
         root = tibetanWordMatch[1].trim();
@@ -48,6 +52,7 @@ class AnalysisParser {
         definition = rest;
       }
     } else {
+      // Fallback if regex doesn't match (e.g. no {})
       definition = content.replace(/{[a-z0-9/\->|,]+}/i, '').trim();
     }
 
@@ -56,105 +61,152 @@ class AnalysisParser {
 
   static serialize(analysisObj, originalWord) {
     const { volls, root, pos, tense, definition } = analysisObj;
-    
+
     const bString = `${pos || 'other'}${tense ? ',' + tense : ''}`;
     const c_and_d = `${root || ''} ${definition || ''}`.trim();
-    
+
     let internalString = '';
     if (volls) {
       internalString = `${volls}{${bString}} ${c_and_d}`;
     } else {
       internalString = `{${bString}} ${c_and_d}`;
     }
-    
+
     return internalString.replace(/\s+/g, ' ').trim();
   }
 }
 
 class DocumentParser {
-  static parse(rawText) {
+  static parse(fullText) {
     const blocks = [];
-    const matches = [...rawText.matchAll(RegexGrammar.BLOCK)];
+    const matches = [...fullText.matchAll(RegexGrammar.BLOCK)];
 
-    if (matches.length === 0 && rawText.trim().length > 0) {
-       return this._parseBlockContent(rawText, null);
+    if (matches.length === 0) {
+      // Fallback: Treat entire text as raw text with no analysis if no blocks found
+      if (fullText.trim().length > 0) {
+        return [{ lines: [{ units: [{ type: 'text', original: fullText }] }] }];
+      }
+      return [];
     }
 
     matches.forEach(match => {
-      const mainContent = match[1];
-      const suppContent = match[2];
-      blocks.push(this._processBlock(mainContent, suppContent));
+      const rawText = match[1];
+      const analysisText = match[2];
+      blocks.push(this._processBlock(rawText, analysisText));
     });
 
     return blocks;
   }
 
-  static _parseBlockContent(text, suppContent) {
-      return this._processBlock(text, suppContent);
-  }
+  static _processBlock(rawText, analysisText) {
+    // 1. Parse Analysis Lines into a Hierarchy
+    const analysisNodes = this._parseAnalysisHierarchy(analysisText);
 
-  static _processBlock(mainContent, suppContent) {
-    const supplementaryMap = new Map();
-    if (suppContent) {
-      const lines = suppContent.split('\n');
-      lines.forEach(line => {
-        const m = line.trim().match(RegexGrammar.SUPPLEMENTARY_LINE);
-        if (m) {
-          const label = m[1];
-          const content = m[2];
-          supplementaryMap.set(label, this._parseNestedUnits(content));
-        }
-      });
+    // 2. Merge Analysis with Raw Text
+    const units = this._mergeAnalysisWithRaw(rawText, analysisNodes);
+
+    // 3. Group into lines (preserving raw text newlines)
+    const lines = [];
+    let currentLineUnits = [];
+
+    units.forEach(unit => {
+      if (unit.type === 'text') {
+        // Split text unit by newlines
+        const parts = unit.original.split('\n');
+        parts.forEach((part, idx) => {
+          if (idx > 0) {
+            // New line detected
+            lines.push({ units: currentLineUnits });
+            currentLineUnits = [];
+          }
+          if (part) {
+            currentLineUnits.push({ type: 'text', original: part });
+          }
+        });
+      } else {
+        currentLineUnits.push(unit);
+      }
+    });
+
+    if (currentLineUnits.length > 0) {
+      lines.push({ units: currentLineUnits });
     }
-
-    const lines = mainContent.split('\n')
-      .filter(line => line.trim() !== '')
-      .map(line => ({
-        units: this._parseLineToUnits(line, supplementaryMap)
-      }));
 
     return { lines };
   }
 
-  static _parseLineToUnits(lineStr, supplementaryMap) {
-    const parts = lineStr.match(RegexGrammar.UNIT_SPLIT) || [];
-    return parts.map(part => {
-      const analyzedMatch = part.match(RegexGrammar.ANALYZED_WORD);
+  static _parseAnalysisHierarchy(analysisText) {
+    const lines = analysisText.split('\n').filter(l => l.trim() !== '');
+    const roots = [];
+    const stack = []; // Stores { depth, node }
 
-      if (analyzedMatch) {
-        const original = analyzedMatch[1];
-        const rawAnnotation = analyzedMatch[2];
-        
-        return {
-          type: 'word',
-          original,
-          rawAnnotation,
-          analysis: AnalysisParser.parse(rawAnnotation),
-          nestedData: this._checkAndParseNested(rawAnnotation),
-          supplementaryData: supplementaryMap?.get(original) || []
-        };
+    lines.forEach(line => {
+      const match = line.match(RegexGrammar.ANALYSIS_LINE);
+      if (!match) return;
+
+      const depth = match[1].length; // Number of tabs
+      const original = match[2];
+      const rawAnnotation = match[3];
+
+      const node = {
+        type: 'word',
+        original,
+        rawAnnotation,
+        analysis: AnalysisParser.parse(rawAnnotation),
+        nestedData: [],
+        supplementaryData: []
+      };
+
+      // Find parent
+      while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+        stack.pop();
+      }
+
+      if (stack.length === 0) {
+        roots.push(node);
       } else {
-        return {
-          type: 'text',
-          original: part
-        };
+        const parent = stack[stack.length - 1].node;
+        parent.nestedData.push(node);
+      }
+
+      stack.push({ depth, node });
+    });
+
+    return roots;
+  }
+
+  static _mergeAnalysisWithRaw(rawText, analysisNodes) {
+    const units = [];
+    let currentIndex = 0;
+
+    analysisNodes.forEach(node => {
+      // Find the node's original text in rawText starting from currentIndex
+      const searchSpace = rawText.substring(currentIndex);
+      const foundIndex = searchSpace.indexOf(node.original);
+
+      if (foundIndex !== -1) {
+        // Text before the match
+        if (foundIndex > 0) {
+          const textBefore = searchSpace.substring(0, foundIndex);
+          units.push({ type: 'text', original: textBefore });
+        }
+
+        // The matched word
+        units.push(node);
+
+        // Advance index
+        currentIndex += foundIndex + node.original.length;
+      } else {
+        console.warn(`Analysis node '${node.original}' not found in remaining text.`);
       }
     });
-  }
 
-  static _checkAndParseNested(annotation) {
-    const complexNestedMatch = annotation.match(/^\[(<.*)\](?=\[.*\]$)/) || annotation.match(/^\[(<.*)\]$/);
-    if (complexNestedMatch) {
-       const nestedContent = complexNestedMatch[1];
-       if (nestedContent.includes('<')) {
-         return this._parseNestedUnits(nestedContent);
-       }
+    // Remaining text
+    if (currentIndex < rawText.length) {
+      units.push({ type: 'text', original: rawText.substring(currentIndex) });
     }
-    return null;
-  }
 
-  static _parseNestedUnits(contentString) {
-    return this._parseLineToUnits(contentString, null);
+    return units;
   }
 }
 
@@ -194,13 +246,13 @@ const truncateDefinition = (def) => {
 // --- Helper Components ---
 
 const AnalysisLabel = ({ text, isSub }) => {
-    if(!text) return null;
-    return <div className={`text-gray-600 ${isSub ? 'text-xs' : 'text-sm'} font-medium`}>{text}</div>
+  if (!text) return null;
+  return <div className={`text-gray-600 ${isSub ? 'text-xs' : 'text-sm'} font-medium`}>{text}</div>
 }
 
 const WordCard = ({ unit, onClick, isNested = false }) => {
   const { analysis, original, nestedData, supplementaryData } = unit;
-  
+
   const mainPosKey = analysis.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
   const mainBorderColor = POS_COLORS[mainPosKey] || POS_COLORS.other;
   const displayDef = truncateDefinition(analysis.definition);
@@ -211,7 +263,7 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
 
   if (subUnits) {
     return (
-      <div 
+      <div
         className="inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group"
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
@@ -221,18 +273,18 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
         {subUnits.map((u, i) => {
           // Check if this sub-unit is just a tsheg
           const isTsheg = u.original.trim() === '་';
-          
+
           return (
-            <div 
-              key={`tib-${i}`} 
+            <div
+              key={`tib-${i}`}
               className={`text-center px-0.5 rounded-t transition-colors ${!isTsheg ? 'hover:bg-blue-50' : ''}`}
-              onClick={(e) => { 
+              onClick={(e) => {
                 // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
                 if (!isTsheg) {
-                  e.stopPropagation(); 
-                  onClick(u, i, subType); 
+                  e.stopPropagation();
+                  onClick(u, i, subType);
                 }
-              }} 
+              }}
             >
               <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>{u.original}</span>
             </div>
@@ -240,54 +292,54 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
         })}
 
         {/* --- Row 2: Main Analysis (Spans all cols) --- */}
-        <div 
-           style={{ gridColumn: `1 / span ${subUnits.length}` }} 
-           className="text-center w-full mb-1"
-           onClick={(e) => { e.stopPropagation(); onClick(unit, null, null); }} // Click here edits main
+        <div
+          style={{ gridColumn: `1 / span ${subUnits.length}` }}
+          className="text-center w-full mb-1"
+          onClick={(e) => { e.stopPropagation(); onClick(unit, null, null); }} // Click here edits main
         >
-           {/* Main Analysis Underline */}
-           <div className={`w-full border-b-[4px] ${mainBorderColor} mb-1`}></div>
-           
-           {/* Main Analysis Text */}
-           <div className="flex flex-col items-center">
-             <AnalysisLabel text={analysis.root} isSub={isNested} />
-             {analysis.tense && <span className="text-xs text-gray-400 italic">({analysis.tense})</span>}
-             <div className={`text-gray-500 ${isNested ? 'text-[10px]' : 'text-xs'} truncate max-w-full`}>
-               {displayDef}
-             </div>
-           </div>
+          {/* Main Analysis Underline */}
+          <div className={`w-full border-b-[4px] ${mainBorderColor} mb-1`}></div>
+
+          {/* Main Analysis Text */}
+          <div className="flex flex-col items-center">
+            <AnalysisLabel text={analysis.root} isSub={isNested} />
+            {analysis.tense && <span className="text-xs text-gray-400 italic">({analysis.tense})</span>}
+            <div className={`text-gray-500 ${isNested ? 'text-[10px]' : 'text-xs'} truncate max-w-full`}>
+              {displayDef}
+            </div>
+          </div>
         </div>
 
         {/* --- Row 3: Sub Analysis (Aligned cols) --- */}
         {subUnits.map((u, i) => {
-           // If tsheg, return empty cell to maintain grid structure but show nothing
-           if (u.original.trim() === '་') {
-             return <div key={`sub-${i}`} />;
-           }
+          // If tsheg, return empty cell to maintain grid structure but show nothing
+          if (u.original.trim() === '་') {
+            return <div key={`sub-${i}`} />;
+          }
 
-           const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
-           const subBorderColor = POS_COLORS[subPosKey] || POS_COLORS.other;
-           const subBgColor = subBorderColor.replace('border-', 'bg-');
-           const subDef = truncateDefinition(u.analysis?.definition);
-           
-           return (
-             <div 
-               key={`sub-${i}`} 
-               className="flex flex-col items-center w-full group/sub"
-               onClick={(e) => { e.stopPropagation(); onClick(u, i, subType); }}
-             >
-                {/* Sub Analysis Underline (Colored Bar) */}
-                <div className={`w-full h-[3px] ${subBgColor} mb-0.5 opacity-80 group-hover/sub:opacity-100`}></div>
-                
-                {/* Sub Analysis Text */}
-                <div className="text-center w-full group-hover/sub:bg-gray-50 rounded">
-                   <div className="text-[10px] font-medium text-gray-600">{u.analysis?.root}</div>
-                   <div className="text-[10px] text-gray-500 truncate w-full leading-tight">
-                      {subDef}
-                   </div>
+          const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
+          const subBorderColor = POS_COLORS[subPosKey] || POS_COLORS.other;
+          const subBgColor = subBorderColor.replace('border-', 'bg-');
+          const subDef = truncateDefinition(u.analysis?.definition);
+
+          return (
+            <div
+              key={`sub-${i}`}
+              className="flex flex-col items-center w-full group/sub"
+              onClick={(e) => { e.stopPropagation(); onClick(u, i, subType); }}
+            >
+              {/* Sub Analysis Underline (Colored Bar) */}
+              <div className={`w-full h-[3px] ${subBgColor} mb-0.5 opacity-80 group-hover/sub:opacity-100`}></div>
+
+              {/* Sub Analysis Text */}
+              <div className="text-center w-full group-hover/sub:bg-gray-50 rounded">
+                <div className="text-[10px] font-medium text-gray-600">{u.analysis?.root}</div>
+                <div className="text-[10px] text-gray-500 truncate w-full leading-tight">
+                  {subDef}
                 </div>
-             </div>
-           );
+              </div>
+            </div>
+          );
         })}
       </div>
     );
@@ -295,12 +347,12 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
 
   // --- Simple Mode (Standard Card) ---
   const borderClass = `border-b-[4px] ${mainBorderColor}`;
-  
+
   return (
-    <div 
+    <div
       className={`inline-flex flex-col items-center mx-1 align-top cursor-pointer group transition-all duration-200 hover:-translate-y-1`}
       onClick={(e) => {
-        e.stopPropagation(); 
+        e.stopPropagation();
         onClick(unit, null, null);
       }}
     >
@@ -324,7 +376,7 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
 const UnitRenderer = ({ unit, indices, onClick, isNested }) => {
   if (unit.type === 'text') {
     return (
-      <span 
+      <span
         className={`inline-block mx-0.5 font-serif ${isNested ? 'text-xl' : FONT_SIZES.tibetan} cursor-text`}
         data-indices={indices ? JSON.stringify(indices) : undefined}
         onClick={(e) => e.stopPropagation()}
@@ -340,11 +392,11 @@ const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick }) => {
   return (
     <div className="my-6 leading-relaxed text-justify">
       {line.units.map((unit, unitIdx) => (
-        <UnitRenderer 
-          key={unitIdx} 
-          unit={unit} 
+        <UnitRenderer
+          key={unitIdx}
+          unit={unit}
           indices={{ blockIdx, lineIdx, unitIdx }}
-          onClick={(subUnit, subIndex, subType) => onUnitClick(blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType)} 
+          onClick={(subUnit, subIndex, subType) => onUnitClick(blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType)}
         />
       ))}
     </div>
@@ -384,7 +436,7 @@ const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
   const toggleTense = (val) => {
     setFormData(prev => ({
       ...prev,
-      tense: prev.tense.includes(val) 
+      tense: prev.tense.includes(val)
         ? prev.tense.filter(t => t !== val)
         : [...prev.tense, val]
     }));
@@ -399,27 +451,27 @@ const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
           <h3 className="text-lg font-bold">{isCreating ? '新增分析' : '編輯分析'}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-black">&times;</button>
         </div>
-        
+
         <div className="p-6 space-y-4 overflow-y-auto">
           <div className="text-center mb-4">
-             <h2 className="text-4xl font-serif">{isCreating ? data : data.original}</h2>
-             {isCreating && <p className="text-sm text-green-600 mt-1">(New Selection)</p>}
+            <h2 className="text-4xl font-serif">{isCreating ? data : data.original}</h2>
+            {isCreating && <p className="text-sm text-green-600 mt-1">(New Selection)</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-             <div>
-               <label className="block text-sm font-medium text-gray-700">Root</label>
-               <input className="w-full border rounded p-2" value={formData.root} onChange={e => setFormData({...formData, root: e.target.value})} placeholder="e.g., འགྲོ་" />
-             </div>
-             <div>
-               <label className="block text-sm font-medium text-gray-700">Full (Volls)</label>
-               <input className="w-full border rounded p-2" value={formData.volls} onChange={e => setFormData({...formData, volls: e.target.value})} />
-             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Root</label>
+              <input className="w-full border rounded p-2" value={formData.root} onChange={e => setFormData({ ...formData, root: e.target.value })} placeholder="e.g., འགྲོ་" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Full (Volls)</label>
+              <input className="w-full border rounded p-2" value={formData.volls} onChange={e => setFormData({ ...formData, volls: e.target.value })} />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">POS</label>
-            <select className="w-full border rounded p-2" value={formData.pos} onChange={e => setFormData({...formData, pos: e.target.value})}>
+            <select className="w-full border rounded p-2" value={formData.pos} onChange={e => setFormData({ ...formData, pos: e.target.value })}>
               <option value="other">Other</option>
               <option value="n">Noun (n)</option>
               <option value="v">Verb (v)</option>
@@ -434,32 +486,32 @@ const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Tense</label>
               <div className="flex flex-wrap gap-2">
                 {['present', 'past', 'future', 'imperative'].map(t => (
-                   <button 
-                     key={t}
-                     onClick={() => toggleTense(t)}
-                     className={`px-2 py-1 text-xs rounded border ${formData.tense.includes(t) ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-50'}`}
-                   >
-                     {t}
-                   </button>
+                  <button
+                    key={t}
+                    onClick={() => toggleTense(t)}
+                    className={`px-2 py-1 text-xs rounded border ${formData.tense.includes(t) ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-50'}`}
+                  >
+                    {t}
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
           <div>
-             <label className="block text-sm font-medium text-gray-700">Definition</label>
-             <textarea className="w-full border rounded p-2" rows={3} value={formData.definition} onChange={e => setFormData({...formData, definition: e.target.value})} placeholder="Full definition here..." />
+            <label className="block text-sm font-medium text-gray-700">Definition</label>
+            <textarea className="w-full border rounded p-2" rows={3} value={formData.definition} onChange={e => setFormData({ ...formData, definition: e.target.value })} placeholder="Full definition here..." />
           </div>
         </div>
 
         <div className="p-4 border-t bg-gray-50 flex justify-between rounded-b-lg">
-           {!isCreating ? (
-             <button onClick={onDelete} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded">刪除分析</button>
-           ) : <div></div>}
-           <div className="space-x-2">
-             <button onClick={onClose} className="px-4 py-2 border rounded hover:bg-gray-100">取消</button>
-             <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存變更</button>
-           </div>
+          {!isCreating ? (
+            <button onClick={onDelete} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded">刪除分析</button>
+          ) : <div></div>}
+          <div className="space-x-2">
+            <button onClick={onClose} className="px-4 py-2 border rounded hover:bg-gray-100">取消</button>
+            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存變更</button>
+          </div>
         </div>
       </div>
     </div>
@@ -473,7 +525,7 @@ const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
 export default function TibetanReader() {
   const [documentData, setDocumentData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [editingTarget, setEditingTarget] = useState(null); 
+  const [editingTarget, setEditingTarget] = useState(null);
   const [isMammothLoaded, setIsMammothLoaded] = useState(false);
   const contentRef = useRef(null);
 
@@ -522,7 +574,7 @@ export default function TibetanReader() {
   };
 
   const handleSelection = useCallback(() => {
-    if (editingTarget) return; 
+    if (editingTarget) return;
 
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
@@ -533,18 +585,18 @@ export default function TibetanReader() {
 
     let node = selection.anchorNode;
     if (node.nodeType === 3) node = node.parentNode;
-    
+
     const wrapper = node.closest('[data-indices]');
     if (!wrapper) return;
 
     try {
       const indices = JSON.parse(wrapper.dataset.indices);
       const { blockIdx, lineIdx, unitIdx } = indices;
-      
+
       const textUnit = documentData[blockIdx].lines[lineIdx].units[unitIdx];
-      
+
       if (textUnit.type !== 'text') return;
-      
+
       const fullText = textUnit.original;
       const startOffset = fullText.indexOf(selectedText);
       if (startOffset === -1) return;
@@ -568,11 +620,11 @@ export default function TibetanReader() {
     if (!editingTarget) return;
     const { indices, isCreating, creationDetails } = editingTarget;
     const newData = [...documentData];
-    
+
     if (isCreating) {
       const { blockIdx, lineIdx, unitIdx } = indices;
       const { startOffset, endOffset, selectedText, fullText } = creationDetails;
-      
+
       const newUnit = {
         type: 'word',
         original: selectedText,
@@ -598,7 +650,7 @@ export default function TibetanReader() {
     } else {
       let targetUnit = newData[indices.blockIdx].lines[indices.lineIdx].units[indices.unitIdx];
       let unitToUpdate = targetUnit;
-      
+
       if (indices.subIndex !== null && indices.subIndex !== undefined) {
         const list = indices.subType === 'nested' ? targetUnit.nestedData : targetUnit.supplementaryData;
         unitToUpdate = list[indices.subIndex];
@@ -634,27 +686,27 @@ export default function TibetanReader() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" onMouseUp={handleSelection}>
       <main className="max-w-5xl mx-auto p-4 sm:p-8">
-        
+
         <div className="flex justify-between items-center mb-8">
-           <h1 className="text-2xl font-bold text-gray-800">藏文分析閱讀器 (React版)</h1>
-           <label className={`cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition ${!isMammothLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}>
-             <span>{isMammothLoaded ? '讀取 Word 檔案 (.docx)' : '載入核心中...'}</span>
-             <input 
-               type="file" 
-               className="hidden" 
-               accept=".docx" 
-               onChange={handleFileUpload} 
-               disabled={!isMammothLoaded}
-             />
-           </label>
+          <h1 className="text-2xl font-bold text-gray-800">藏文分析閱讀器 (React版)</h1>
+          <label className={`cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition ${!isMammothLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <span>{isMammothLoaded ? '讀取 Word 檔案 (.docx)' : '載入核心中...'}</span>
+            <input
+              type="file"
+              className="hidden"
+              accept=".docx"
+              onChange={handleFileUpload}
+              disabled={!isMammothLoaded}
+            />
+          </label>
         </div>
 
         <div ref={contentRef} className="bg-white shadow-lg rounded-xl p-8 min-h-[500px]">
           {loading && <div className="text-center text-gray-500 mt-10">正在解析文件...</div>}
-          
+
           {!loading && documentData.length === 0 && (
             <div className="text-center text-gray-400 mt-20 border-2 border-dashed border-gray-200 rounded-lg p-10">
-              請上傳 .docx 檔案以開始分析。<br/>
+              請上傳 .docx 檔案以開始分析。<br />
               <span className="text-sm mt-2 inline-block">您可以在未分析的文字上選取並建立新的註釋。</span>
             </div>
           )}
@@ -662,12 +714,12 @@ export default function TibetanReader() {
           {documentData.map((block, bIdx) => (
             <div key={bIdx} className="mb-12 pb-8 border-b border-gray-100 last:border-0">
               {block.lines.map((line, lIdx) => (
-                <LineRenderer 
-                  key={lIdx} 
-                  line={line} 
-                  blockIdx={bIdx} 
+                <LineRenderer
+                  key={lIdx}
+                  line={line}
+                  blockIdx={bIdx}
                   lineIdx={lIdx}
-                  onUnitClick={handleUnitClick} 
+                  onUnitClick={handleUnitClick}
                 />
               ))}
             </div>
@@ -675,11 +727,11 @@ export default function TibetanReader() {
         </div>
       </main>
 
-      <EditModal 
-        isOpen={!!editingTarget} 
-        data={editingTarget?.data || {}} 
+      <EditModal
+        isOpen={!!editingTarget}
+        data={editingTarget?.data || {}}
         isCreating={editingTarget?.isCreating}
-        onClose={() => setEditingTarget(null)} 
+        onClose={() => setEditingTarget(null)}
         onSave={handleSaveEdit}
         onDelete={handleDeleteAnalysis}
       />
