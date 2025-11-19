@@ -172,7 +172,23 @@ class DocumentParser {
       stack.push({ depth, node });
     });
 
+    // Post-process to fill gaps in nested data (e.g. tshegs)
+    this._fillNestedGaps(roots);
+
     return roots;
+  }
+
+  static _fillNestedGaps(nodes) {
+    nodes.forEach(node => {
+      if (node.nestedData && node.nestedData.length > 0) {
+        // Recursively fill gaps for children first
+        this._fillNestedGaps(node.nestedData);
+
+        // Now merge current node's original text with its children
+        // This will insert 'text' units (like tshegs) between the analysis nodes
+        node.nestedData = this._mergeAnalysisWithRaw(node.original, node.nestedData);
+      }
+    });
   }
 
   static _mergeAnalysisWithRaw(rawText, analysisNodes) {
