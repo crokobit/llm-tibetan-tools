@@ -268,6 +268,7 @@ const AnalysisLabel = ({ text, isSub }) => {
 
 const WordCard = ({ unit, onClick, isNested = false }) => {
   const { analysis, original, nestedData, supplementaryData } = unit;
+  const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
 
   const mainPosKey = analysis.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
   const mainBorderColor = POS_COLORS[mainPosKey] || POS_COLORS.other;
@@ -280,10 +281,10 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
   if (subUnits) {
     return (
       <div
-        className="inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group"
+        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${hoveredSubIndex === null ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
-        onClick={(e) => { e.stopPropagation(); onClick(unit, null, null); }}
+        onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
       >
         {/* --- Row 1: Tibetan Sub-Words (The "Main Word") --- */}
         {subUnits.map((u, i) => {
@@ -293,12 +294,13 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
           return (
             <div
               key={`tib-${i}`}
-              className={`text-center px-0.5 rounded-t transition-colors ${!isTsheg ? 'hover:bg-blue-50' : ''}`}
+              className={`text-center px-0.5 rounded-t transition-colors ${i === hoveredSubIndex ? 'bg-blue-200' : ''}`}
               onClick={(e) => {
                 // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
                 if (!isTsheg) {
                   e.stopPropagation();
-                  onClick(u, i, subType);
+                  // User request: Clicking the main word (Tibetan text) should enter the word edit (main), not the compound edit (sub).
+                  onClick(e, unit, null, null);
                 }
               }}
             >
@@ -311,7 +313,7 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
         <div
           style={{ gridColumn: `1 / span ${subUnits.length}` }}
           className="text-center w-full mb-1"
-          onClick={(e) => { e.stopPropagation(); onClick(unit, null, null); }} // Click here edits main
+          onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
         >
           {/* Main Analysis Underline */}
           <div className={`w-full border-b-[4px] ${mainBorderColor} mb-1`}></div>
@@ -341,14 +343,16 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
           return (
             <div
               key={`sub-${i}`}
-              className="flex flex-col items-center w-full group/sub"
-              onClick={(e) => { e.stopPropagation(); onClick(u, i, subType); }}
+              className="flex flex-col items-center w-full group/sub bg-white hover:bg-blue-200 rounded transition-colors duration-200"
+              onMouseEnter={() => setHoveredSubIndex(i)}
+              onMouseLeave={() => setHoveredSubIndex(null)}
+              onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
             >
               {/* Sub Analysis Underline (Colored Bar) */}
               <div className={`w-full h-[3px] ${subBgColor} mb-0.5 opacity-80 group-hover/sub:opacity-100`}></div>
 
               {/* Sub Analysis Text */}
-              <div className="text-center w-full group-hover/sub:bg-gray-50 rounded">
+              <div className="text-center w-full rounded">
                 <div className="text-[10px] font-medium text-gray-600">{u.analysis?.root}</div>
                 <div className="text-[10px] text-gray-500 truncate w-full leading-tight">
                   {subDef}
@@ -369,7 +373,7 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
       className={`inline-flex flex-col items-center mx-1 align-top cursor-pointer group transition-all duration-200 hover:-translate-y-1`}
       onClick={(e) => {
         e.stopPropagation();
-        onClick(unit, null, null);
+        onClick(e, unit, null, null);
       }}
     >
       {/* Main Tibetan Word */}
@@ -412,7 +416,7 @@ const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick }) => {
           key={unitIdx}
           unit={unit}
           indices={{ blockIdx, lineIdx, unitIdx }}
-          onClick={(subUnit, subIndex, subType) => onUnitClick(blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType)}
+          onClick={(e, subUnit, subIndex, subType) => onUnitClick(e, blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType)}
         />
       ))}
     </div>
@@ -421,10 +425,74 @@ const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick }) => {
 
 // --- Modal Component ---
 
-const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
+const PosSelect = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const options = [
+    { value: 'other', label: 'Other', color: POS_COLORS.other },
+    { value: 'n', label: 'Noun (n)', color: POS_COLORS.n },
+    { value: 'v', label: 'Verb (v)', color: POS_COLORS.v },
+    { value: 'adj', label: 'Adjective (adj)', color: POS_COLORS.adj },
+    { value: 'adv', label: 'Adverb (adv)', color: POS_COLORS.adv },
+    { value: 'part', label: 'Particle', color: POS_COLORS.other },
+  ];
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+  const selectedBg = selectedOption.color.replace('border-', 'bg-');
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full border rounded p-2 text-left bg-white flex items-center justify-between hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <span className="text-sm">{selectedOption.label}</span>
+        <div className={`w-3 h-3 rounded-full ${selectedBg}`}></div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-20 w-full bg-white border rounded shadow-lg mt-1 max-h-60 overflow-auto">
+          {options.map((opt) => {
+            const barColor = opt.color.replace('border-', 'bg-');
+            return (
+              <div
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className="p-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
+              >
+                <div className="text-sm">{opt.label}</div>
+                <div className={`w-3 h-3 rounded-full ${barColor}`}></div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anchorRect }) => {
   const [formData, setFormData] = useState({
     volls: '', root: '', pos: '', tense: [], definition: ''
   });
+  const popoverRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, opacity: 0 }); // Start invisible to measure
+  const [placement, setPlacement] = useState('bottom'); // 'top' or 'bottom'
 
   useEffect(() => {
     if (isCreating) {
@@ -439,6 +507,61 @@ const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
       });
     }
   }, [data, isCreating]);
+
+  // Smart Positioning
+  React.useLayoutEffect(() => {
+    if (!isOpen || !anchorRect || !popoverRef.current) return;
+
+    const popRect = popoverRef.current.getBoundingClientRect();
+    const viewportH = window.innerHeight;
+    const viewportW = window.innerWidth;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+
+    // Default: Bottom Left aligned
+    let top = anchorRect.bottom + scrollY + 12; // +12 for arrow
+    let left = anchorRect.left + scrollX;
+    let newPlacement = 'bottom';
+
+    // 1. Vertical Collision
+    // If popover goes below viewport, try placing it above
+    if (anchorRect.bottom + popRect.height + 20 > viewportH + scrollY) {
+      // Check if there is space above
+      if (anchorRect.top - popRect.height - 12 > scrollY) {
+        top = anchorRect.top + scrollY - popRect.height - 12; // -12 for arrow
+        newPlacement = 'top';
+      } else {
+        // If no space above either, just stick to bottom edge of viewport
+        top = scrollY + viewportH - popRect.height - 10;
+        newPlacement = 'bottom'; // Fallback
+      }
+    }
+
+    // 2. Horizontal Collision
+    if (left + popRect.width > viewportW + scrollX) {
+      left = scrollX + viewportW - popRect.width - 10;
+    }
+    if (left < scrollX) {
+      left = scrollX + 10;
+    }
+
+    setCoords({ top, left, opacity: 1 });
+    setPlacement(newPlacement);
+  }, [isOpen, anchorRect, formData.pos, formData.tense.length]); // Re-calc if size changes
+
+  // Click outside to close
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -461,74 +584,77 @@ const EditModal = ({ isOpen, onClose, onSave, onDelete, data, isCreating }) => {
   const isVerb = ['v', 'vd', 'vn'].some(t => formData.pos.includes(t));
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h3 className="text-lg font-bold">{isCreating ? '新增分析' : '編輯分析'}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-black">&times;</button>
-        </div>
+    <div
+      ref={popoverRef}
+      className="absolute z-50 bg-white rounded shadow-xl w-64 flex flex-col border border-gray-300 text-sm"
+      style={{ top: coords.top, left: coords.left, opacity: coords.opacity }}
+    >
+      {/* Arrow */}
+      <div
+        className={`absolute w-3 h-3 bg-white border-l border-t border-gray-300 transform rotate-45 ${placement === 'bottom' ? '-top-1.5 left-4' : '-bottom-1.5 left-4 border-l-0 border-t-0 border-r border-b'}`}
+      ></div>
 
-        <div className="p-6 space-y-4 overflow-y-auto">
-          <div className="text-center mb-4">
-            <h2 className="text-4xl font-serif">{isCreating ? data : data.original}</h2>
-            {isCreating && <p className="text-sm text-green-600 mt-1">(New Selection)</p>}
+      {/* Header removed as requested */}
+
+      <div className="p-3 space-y-2">
+        {/* Row 1: Root & POS */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <input
+              className="w-full border rounded px-2 py-1 bg-gray-50 focus:bg-white"
+              value={formData.root}
+              onChange={e => setFormData({ ...formData, root: e.target.value })}
+              placeholder="Root"
+            />
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Root</label>
-              <input className="w-full border rounded p-2" value={formData.root} onChange={e => setFormData({ ...formData, root: e.target.value })} placeholder="e.g., འགྲོ་" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Full (Volls)</label>
-              <input className="w-full border rounded p-2" value={formData.volls} onChange={e => setFormData({ ...formData, volls: e.target.value })} />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">POS</label>
-            <select className="w-full border rounded p-2" value={formData.pos} onChange={e => setFormData({ ...formData, pos: e.target.value })}>
-              <option value="other">Other</option>
-              <option value="n">Noun (n)</option>
-              <option value="v">Verb (v)</option>
-              <option value="adj">Adjective (adj)</option>
-              <option value="adv">Adverb (adv)</option>
-              <option value="part">Particle</option>
-            </select>
-          </div>
-
-          {isVerb && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tense</label>
-              <div className="flex flex-wrap gap-2">
-                {['present', 'past', 'future', 'imperative'].map(t => (
-                  <button
-                    key={t}
-                    onClick={() => toggleTense(t)}
-                    className={`px-2 py-1 text-xs rounded border ${formData.tense.includes(t) ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-50'}`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Definition</label>
-            <textarea className="w-full border rounded p-2" rows={3} value={formData.definition} onChange={e => setFormData({ ...formData, definition: e.target.value })} placeholder="Full definition here..." />
+          <div className="w-24">
+            <PosSelect value={formData.pos} onChange={(val) => setFormData({ ...formData, pos: val })} />
           </div>
         </div>
 
-        <div className="p-4 border-t bg-gray-50 flex justify-between rounded-b-lg">
-          {!isCreating ? (
-            <button onClick={onDelete} className="text-red-600 hover:bg-red-50 px-3 py-2 rounded">刪除分析</button>
-          ) : <div></div>}
-          <div className="space-x-2">
-            <button onClick={onClose} className="px-4 py-2 border rounded hover:bg-gray-100">取消</button>
-            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存變更</button>
-          </div>
+        {/* Row 2: Volls (Optional) */}
+        <div>
+          <input
+            className="w-full border rounded px-2 py-1 text-xs text-gray-600 placeholder-gray-400"
+            value={formData.volls}
+            onChange={e => setFormData({ ...formData, volls: e.target.value })}
+            placeholder="Full form (optional)"
+          />
         </div>
+
+        {/* Row 3: Tense (Conditional) */}
+        {isVerb && (
+          <div className="flex flex-wrap gap-1">
+            {['present', 'past', 'future', 'imperative'].map(t => (
+              <button
+                key={t}
+                onClick={() => toggleTense(t)}
+                className={`px-1.5 py-0.5 text-[10px] rounded border ${formData.tense.includes(t) ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-50 text-gray-500'}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Row 4: Definition */}
+        <div>
+          <textarea
+            className="w-full border rounded px-2 py-1 text-xs"
+            rows={2}
+            value={formData.definition}
+            onChange={e => setFormData({ ...formData, definition: e.target.value })}
+            placeholder="Definition..."
+          />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-3 py-2 bg-gray-50 border-t flex justify-between items-center rounded-b">
+        {!isCreating ? (
+          <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs">Delete</button>
+        ) : <span></span>}
+        <button onClick={handleSave} className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 font-medium">Save</button>
       </div>
     </div>
   );
@@ -542,6 +668,7 @@ export default function TibetanReader() {
   const [documentData, setDocumentData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingTarget, setEditingTarget] = useState(null);
+  const [anchorRect, setAnchorRect] = useState(null);
   const [isMammothLoaded, setIsMammothLoaded] = useState(false);
   const contentRef = useRef(null);
 
@@ -581,7 +708,10 @@ export default function TibetanReader() {
     }
   };
 
-  const handleUnitClick = (blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType) => {
+  const handleUnitClick = (event, blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setAnchorRect(rect);
+
     setEditingTarget({
       indices: { blockIdx, lineIdx, unitIdx, subIndex, subType },
       data: subUnit,
@@ -618,6 +748,9 @@ export default function TibetanReader() {
       if (startOffset === -1) return;
 
       const endOffset = startOffset + selectedText.length;
+
+      const rect = range.getBoundingClientRect();
+      setAnchorRect(rect);
 
       setEditingTarget({
         indices: { blockIdx, lineIdx, unitIdx },
@@ -743,13 +876,14 @@ export default function TibetanReader() {
         </div>
       </main>
 
-      <EditModal
+      <EditPopover
         isOpen={!!editingTarget}
-        data={editingTarget?.data || {}}
-        isCreating={editingTarget?.isCreating}
         onClose={() => setEditingTarget(null)}
         onSave={handleSaveEdit}
         onDelete={handleDeleteAnalysis}
+        data={editingTarget ? editingTarget.data : null}
+        isCreating={editingTarget ? editingTarget.isCreating : false}
+        anchorRect={anchorRect}
       />
     </div>
   );
