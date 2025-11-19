@@ -836,22 +836,69 @@ export default function TibetanReader() {
     setEditingTarget(null);
   }
 
+  // --- Debug Mode Logic ---
+  const [debugMode, setDebugMode] = useState(false);
+
+  const generateRawOutput = () => {
+    return documentData.map(block => {
+      let rawText = '';
+      let analysisLines = [];
+
+      block.lines.forEach((line, lIdx) => {
+        line.units.forEach(unit => {
+          rawText += unit.original;
+
+          if (unit.type === 'word') {
+            const mainAnalysis = AnalysisParser.serialize(unit.analysis);
+            analysisLines.push(`<${unit.original}>[${mainAnalysis}]`);
+
+            if (unit.nestedData) {
+              unit.nestedData.forEach(sub => {
+                if (sub.type === 'word') {
+                  const subAnalysis = AnalysisParser.serialize(sub.analysis);
+                  analysisLines.push(`\t<${sub.original}>[${subAnalysis}]`);
+                }
+              });
+            }
+          }
+        });
+        if (lIdx < block.lines.length - 1) rawText += '\n';
+      });
+
+      return `>>> ${rawText} >>>>\n${analysisLines.join('\n')}\n>>>>>`;
+    }).join('\n\n');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" onMouseUp={handleSelection}>
       <main className="max-w-5xl mx-auto p-4 sm:p-8">
 
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold text-gray-800">藏文分析閱讀器 (React版)</h1>
-          <label className={`cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition ${!isMammothLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            <span>{isMammothLoaded ? '讀取 Word 檔案 (.docx)' : '載入核心中...'}</span>
-            <input
-              type="file"
-              className="hidden"
-              accept=".docx"
-              onChange={handleFileUpload}
-              disabled={!isMammothLoaded}
-            />
-          </label>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="debugMode"
+                checked={debugMode}
+                onChange={(e) => setDebugMode(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <label htmlFor="debugMode" className="text-sm text-gray-600 cursor-pointer select-none">Debug Mode</label>
+            </div>
+
+            <label className={`cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition ${!isMammothLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <span>{isMammothLoaded ? '讀取 Word 檔案 (.docx)' : '載入核心中...'}</span>
+              <input
+                type="file"
+                className="hidden"
+                accept=".docx"
+                onChange={handleFileUpload}
+                disabled={!isMammothLoaded}
+              />
+            </label>
+          </div>
         </div>
 
         <div ref={contentRef} className="bg-white shadow-lg rounded-xl p-8 min-h-[500px]">
@@ -878,6 +925,25 @@ export default function TibetanReader() {
             </div>
           ))}
         </div>
+
+        {debugMode && (
+          <div className="mt-8 p-6 bg-gray-900 text-green-400 rounded-xl shadow-lg overflow-hidden">
+            <h3 className="text-white font-bold mb-4 border-b border-gray-700 pb-2 flex justify-between items-center">
+              <span>Debug: Raw Text & Analysis</span>
+              <button
+                onClick={() => navigator.clipboard.writeText(generateRawOutput())}
+                className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-200 transition-colors"
+              >
+                Copy to Clipboard
+              </button>
+            </h3>
+            <textarea
+              readOnly
+              className="w-full h-96 bg-gray-800 p-4 rounded font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={generateRawOutput()}
+            />
+          </div>
+        )}
       </main>
 
       <EditPopover
