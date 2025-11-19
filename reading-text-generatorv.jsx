@@ -266,7 +266,7 @@ const AnalysisLabel = ({ text, isSub }) => {
   return <div className={`text-gray-600 ${isSub ? 'text-xs' : 'text-sm'} font-medium`}>{text}</div>
 }
 
-const WordCard = ({ unit, onClick, isNested = false }) => {
+const WordCard = ({ unit, onClick, isNested = false, indices }) => {
   const { analysis, original, nestedData, supplementaryData } = unit;
   const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
 
@@ -281,6 +281,7 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
   if (subUnits) {
     return (
       <div
+        data-indices={indices ? JSON.stringify(indices) : undefined}
         className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${hoveredSubIndex === null ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
@@ -374,6 +375,7 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
 
   return (
     <div
+      data-indices={indices ? JSON.stringify(indices) : undefined}
       className={`inline-flex flex-col items-center mx-1 align-top cursor-pointer group transition-all duration-200 hover:-translate-y-1`}
       onClick={(e) => {
         e.stopPropagation();
@@ -409,7 +411,7 @@ const UnitRenderer = ({ unit, indices, onClick, isNested }) => {
       </span>
     );
   }
-  return <WordCard unit={unit} onClick={onClick} isNested={isNested} />;
+  return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} />;
 };
 
 const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick }) => {
@@ -490,17 +492,26 @@ const PosSelect = ({ value, onChange }) => {
   );
 };
 
-const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anchorRect }) => {
+const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anchorRect, possibleParents }) => {
   const [formData, setFormData] = useState({
     volls: '', root: '', pos: '', tense: [], definition: ''
   });
+  const [parentMode, setParentMode] = useState('main'); // 'main' or 'sub'
   const popoverRef = useRef(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0, opacity: 0 }); // Start invisible to measure
-  const [placement, setPlacement] = useState('bottom'); // 'top' or 'bottom'
+  const [coords, setCoords] = useState({ top: 0, left: 0, opacity: 0 });
+  const [placement, setPlacement] = useState('bottom');
 
   useEffect(() => {
     if (isCreating) {
       setFormData({ volls: '', root: '', pos: 'other', tense: [], definition: '' });
+      // Default to 'sub' if available as it's likely the intent when selecting inside a word
+      if (possibleParents && possibleParents.length > 0) {
+        const subOption = possibleParents.find(p => p.id === 'sub');
+        if (subOption) setParentMode('sub');
+        else setParentMode('main');
+      } else {
+        setParentMode('main');
+      }
     } else if (data && data.analysis) {
       setFormData({
         volls: data.analysis.volls || '',
@@ -510,7 +521,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
         definition: data.analysis.definition || ''
       });
     }
-  }, [data, isCreating]);
+  }, [data, isCreating, possibleParents]);
 
   // Smart Positioning
   React.useLayoutEffect(() => {
@@ -522,26 +533,20 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
     const scrollY = window.scrollY;
     const scrollX = window.scrollX;
 
-    // Default: Bottom Left aligned
-    let top = anchorRect.bottom + scrollY + 12; // +12 for arrow
+    let top = anchorRect.bottom + scrollY + 12;
     let left = anchorRect.left + scrollX;
     let newPlacement = 'bottom';
 
-    // 1. Vertical Collision
-    // If popover goes below viewport, try placing it above
     if (anchorRect.bottom + popRect.height + 20 > viewportH + scrollY) {
-      // Check if there is space above
       if (anchorRect.top - popRect.height - 12 > scrollY) {
-        top = anchorRect.top + scrollY - popRect.height - 12; // -12 for arrow
+        top = anchorRect.top + scrollY - popRect.height - 12;
         newPlacement = 'top';
       } else {
-        // If no space above either, just stick to bottom edge of viewport
         top = scrollY + viewportH - popRect.height - 10;
-        newPlacement = 'bottom'; // Fallback
+        newPlacement = 'bottom';
       }
     }
 
-    // 2. Horizontal Collision
     if (left + popRect.width > viewportW + scrollX) {
       left = scrollX + viewportW - popRect.width - 10;
     }
@@ -551,19 +556,15 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
 
     setCoords({ top, left, opacity: 1 });
     setPlacement(newPlacement);
-  }, [isOpen, anchorRect, formData.pos, formData.tense.length]); // Re-calc if size changes
+  }, [isOpen, anchorRect, formData.pos, formData.tense.length, parentMode]);
 
-  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (popoverRef.current && !popoverRef.current.contains(event.target)) {
         onClose();
       }
     };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose]);
 
@@ -573,7 +574,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
     onSave({
       ...formData,
       tense: formData.tense.join('|')
-    });
+    }, parentMode);
   };
 
   const toggleTense = (val) => {
@@ -598,9 +599,23 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
         className={`absolute w-3 h-3 bg-white border-l border-t border-gray-300 transform rotate-45 ${placement === 'bottom' ? '-top-1.5 left-4' : '-bottom-1.5 left-4 border-l-0 border-t-0 border-r border-b'}`}
       ></div>
 
-      {/* Header removed as requested */}
-
       <div className="p-3 space-y-2">
+        {/* Parent Selection Dropdown */}
+        {isCreating && possibleParents && possibleParents.length > 1 && (
+          <div className="mb-2">
+            <label className="block text-xs text-gray-500 mb-1">Add Analysis To:</label>
+            <select
+              value={parentMode}
+              onChange={(e) => setParentMode(e.target.value)}
+              className="w-full border rounded px-2 py-1 text-xs bg-blue-50 border-blue-200 text-blue-800 font-medium focus:outline-none focus:border-blue-400"
+            >
+              {possibleParents.map(p => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Row 1: Root & POS */}
         <div className="flex gap-2">
           <div className="flex-1">
@@ -664,6 +679,8 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
   );
 };
 
+// ChoicePopover removed
+
 // ==========================================
 // 4. MAIN APP COMPONENT
 // ==========================================
@@ -675,6 +692,7 @@ export default function TibetanReader() {
   const [anchorRect, setAnchorRect] = useState(null);
   const [isMammothLoaded, setIsMammothLoaded] = useState(false);
   const contentRef = useRef(null);
+  const ignoreClickRef = useRef(false);
 
   useEffect(() => {
     if (window.mammoth) {
@@ -713,6 +731,8 @@ export default function TibetanReader() {
   };
 
   const handleUnitClick = (event, blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType) => {
+    if (ignoreClickRef.current) return;
+
     const rect = event.currentTarget.getBoundingClientRect();
     setAnchorRect(rect);
 
@@ -733,50 +753,104 @@ export default function TibetanReader() {
     const selectedText = range.toString().trim();
     if (!selectedText) return;
 
-    let node = selection.anchorNode;
-    if (node.nodeType === 3) node = node.parentNode;
+    // Helper to find unit indices from a DOM node
+    const getIndices = (node) => {
+      const wrapper = node.nodeType === 3 ? node.parentNode.closest('[data-indices]') : node.closest('[data-indices]');
+      return wrapper ? JSON.parse(wrapper.dataset.indices) : null;
+    };
 
-    const wrapper = node.closest('[data-indices]');
-    if (!wrapper) return;
+    const startIndices = getIndices(selection.anchorNode);
+    const endIndices = getIndices(selection.focusNode);
 
-    try {
-      const indices = JSON.parse(wrapper.dataset.indices);
-      const { blockIdx, lineIdx, unitIdx } = indices;
+    if (!startIndices || !endIndices) return;
+    if (startIndices.blockIdx !== endIndices.blockIdx || startIndices.lineIdx !== endIndices.lineIdx) return;
 
-      const textUnit = documentData[blockIdx].lines[lineIdx].units[unitIdx];
+    const { blockIdx, lineIdx } = startIndices;
+    const startUnitIdx = Math.min(startIndices.unitIdx, endIndices.unitIdx);
+    const endUnitIdx = Math.max(startIndices.unitIdx, endIndices.unitIdx);
 
-      if (textUnit.type !== 'text') return;
+    const lineUnits = documentData[blockIdx].lines[lineIdx].units;
 
-      const fullText = textUnit.original;
-      const startOffset = fullText.indexOf(selectedText);
-      if (startOffset === -1) return;
+    // Check for overlaps with word units
+    let exactMatchUnit = null;
+    let candidateParent = null;
 
-      const endOffset = startOffset + selectedText.length;
+    for (let i = startUnitIdx; i <= endUnitIdx; i++) {
+      if (lineUnits[i].type === 'word') {
+        if (startUnitIdx === endUnitIdx && lineUnits[i].original === selectedText) {
+          exactMatchUnit = lineUnits[i];
+        }
+        // If selection is fully contained in one word, that word is a candidate parent
+        if (startUnitIdx === endUnitIdx) {
+          candidateParent = lineUnits[i];
+        }
+      }
+    }
 
-      const rect = range.getBoundingClientRect();
-      setAnchorRect(rect);
+    const rect = range.getBoundingClientRect();
+    setAnchorRect(rect);
 
+    // Case 1: Exact match -> Edit
+    if (exactMatchUnit) {
       setEditingTarget({
-        indices: { blockIdx, lineIdx, unitIdx },
-        data: selectedText,
-        isCreating: true,
-        creationDetails: { startOffset, endOffset, selectedText, fullText }
+        indices: { blockIdx, lineIdx, unitIdx: startUnitIdx },
+        data: exactMatchUnit,
+        isCreating: false
       });
       selection.removeAllRanges();
-
-    } catch (e) {
-      console.error("Selection error", e);
+      ignoreClickRef.current = true;
+      setTimeout(() => { ignoreClickRef.current = false; }, 300);
+      return;
     }
+
+    // Case 2: Create New (with possible parents)
+    // Calculate offsets
+    let startOffset = -1;
+    let fullText = '';
+
+    if (startUnitIdx === endUnitIdx) {
+      const unit = lineUnits[startUnitIdx];
+      fullText = unit.original;
+      startOffset = fullText.indexOf(selectedText);
+    }
+
+    // Construct possible parents
+    const possibleParents = [
+      { id: 'main', label: 'Main Analysis (Independent)' }
+    ];
+
+    if (candidateParent) {
+      possibleParents.push({
+        id: 'sub',
+        label: `Sub-analysis of "${candidateParent.analysis.root || candidateParent.original}"`
+      });
+    }
+
+    setEditingTarget({
+      indices: { blockIdx, lineIdx, unitIdx: startUnitIdx, endUnitIdx },
+      data: selectedText,
+      isCreating: true,
+      possibleParents,
+      creationDetails: {
+        selectedText,
+        startOffset,
+        fullText
+      }
+    });
+    selection.removeAllRanges();
+    ignoreClickRef.current = true;
+    setTimeout(() => { ignoreClickRef.current = false; }, 300);
+
   }, [documentData, editingTarget]);
 
-  const handleSaveEdit = (newAnalysisValues) => {
+  const handleSaveEdit = (newAnalysisValues, saveMode = 'main') => {
     if (!editingTarget) return;
     const { indices, isCreating, creationDetails } = editingTarget;
     const newData = [...documentData];
 
     if (isCreating) {
       const { blockIdx, lineIdx, unitIdx } = indices;
-      const { startOffset, endOffset, selectedText, fullText } = creationDetails;
+      const { startOffset, selectedText, fullText } = creationDetails;
 
       const newUnit = {
         type: 'word',
@@ -789,18 +863,70 @@ export default function TibetanReader() {
       newUnit.rawAnnotation = AnalysisParser.serialize(newAnalysisValues, selectedText);
       newUnit.rawAnnotation = `[${newUnit.rawAnnotation}]`;
 
-      const preText = fullText.substring(0, startOffset);
-      const postText = fullText.substring(endOffset);
+      if (saveMode === 'sub') {
+        // Add as Sub-Analysis (Nested)
+        const parentUnit = newData[blockIdx].lines[lineIdx].units[unitIdx];
+        let targetList = parentUnit.nestedData || [];
 
-      const newUnits = [];
-      if (preText) newUnits.push({ type: 'text', original: preText });
-      newUnits.push(newUnit);
-      if (postText) newUnits.push({ type: 'text', original: postText });
+        if (targetList.length === 0) {
+          targetList = [{ type: 'text', original: parentUnit.original }];
+        }
 
-      const lineUnits = newData[blockIdx].lines[lineIdx].units;
-      lineUnits.splice(unitIdx, 1, ...newUnits);
+        // Find where to insert in nested list
+        let currentOffset = 0;
+        let targetSubIndex = -1;
+        let relativeStart = 0;
+
+        // We need to find the sub-unit that contains the startOffset
+        for (let i = 0; i < targetList.length; i++) {
+          const len = targetList[i].original.length;
+          if (startOffset >= currentOffset && startOffset < currentOffset + len) {
+            targetSubIndex = i;
+            relativeStart = startOffset - currentOffset;
+            break;
+          }
+          currentOffset += len;
+        }
+
+        if (targetSubIndex !== -1 && targetList[targetSubIndex].type === 'text') {
+          const subFullText = targetList[targetSubIndex].original;
+          const preText = subFullText.substring(0, relativeStart);
+          const postText = subFullText.substring(relativeStart + selectedText.length);
+
+          const newSubUnits = [];
+          if (preText) newSubUnits.push({ type: 'text', original: preText });
+          newSubUnits.push(newUnit);
+          if (postText) newSubUnits.push({ type: 'text', original: postText });
+
+          targetList.splice(targetSubIndex, 1, ...newSubUnits);
+          parentUnit.nestedData = targetList;
+        } else {
+          console.error("Could not find valid text node for sub-analysis insertion");
+        }
+
+      } else {
+        // Add as Main Analysis (Independent)
+        // This replaces/splits the unit(s) at the top level
+
+        // Note: If we are replacing a 'word' unit with a new 'word' unit (plus text), 
+        // we are essentially destroying the old word structure.
+
+        // If startUnitIdx === endUnitIdx, we split that unit.
+        const endOffset = startOffset + selectedText.length;
+        const preText = fullText.substring(0, startOffset);
+        const postText = fullText.substring(endOffset);
+
+        const newUnits = [];
+        if (preText) newUnits.push({ type: 'text', original: preText });
+        newUnits.push(newUnit);
+        if (postText) newUnits.push({ type: 'text', original: postText });
+
+        const lineUnits = newData[blockIdx].lines[lineIdx].units;
+        lineUnits.splice(unitIdx, 1, ...newUnits);
+      }
 
     } else {
+      // Editing existing
       let targetUnit = newData[indices.blockIdx].lines[indices.lineIdx].units[indices.unitIdx];
       let unitToUpdate = targetUnit;
 
@@ -953,8 +1079,11 @@ export default function TibetanReader() {
         onDelete={handleDeleteAnalysis}
         data={editingTarget ? editingTarget.data : null}
         isCreating={editingTarget ? editingTarget.isCreating : false}
+        possibleParents={editingTarget ? editingTarget.possibleParents : []}
         anchorRect={anchorRect}
       />
+
+      {/* ChoicePopover removed */}
     </div>
   );
 }
