@@ -808,8 +808,11 @@ export default function TibetanReader() {
     if (!selection || selection.isCollapsed) return;
 
     const range = selection.getRangeAt(0);
-    const selectedText = range.toString().trim();
+    let selectedText = range.toString().trim();
     if (!selectedText) return;
+
+    // Remove leading or trailing Tibetan tseg (་) if present
+    selectedText = selectedText.replace(/^་+|་+$/g, '');
 
     // Helper to find unit indices from a DOM node
     const getIndices = (node) => {
