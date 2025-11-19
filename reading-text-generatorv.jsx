@@ -340,16 +340,20 @@ const WordCard = ({ unit, onClick, isNested = false }) => {
           const subBgColor = subBorderColor.replace('border-', 'bg-');
           const subDef = truncateDefinition(u.analysis?.definition);
 
+          const isAnalyzed = !!u.analysis;
+
           return (
             <div
               key={`sub-${i}`}
-              className="flex flex-col items-center w-full group/sub bg-white hover:bg-blue-200 rounded transition-colors duration-200"
-              onMouseEnter={() => setHoveredSubIndex(i)}
-              onMouseLeave={() => setHoveredSubIndex(null)}
+              className={`flex flex-col items-center w-full group/sub rounded transition-colors duration-200 ${isAnalyzed ? 'bg-white hover:bg-blue-200 cursor-pointer' : ''}`}
+              onMouseEnter={isAnalyzed ? () => setHoveredSubIndex(i) : undefined}
+              onMouseLeave={isAnalyzed ? () => setHoveredSubIndex(null) : undefined}
               onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
             >
               {/* Sub Analysis Underline (Colored Bar) */}
-              <div className={`w-full h-[3px] ${subBgColor} mb-0.5 opacity-80 group-hover/sub:opacity-100`}></div>
+              {u.analysis && (
+                <div className={`w-full h-[3px] ${subBgColor} mb-0.5 opacity-80 group-hover/sub:opacity-100`}></div>
+              )}
 
               {/* Sub Analysis Text */}
               <div className="text-center w-full rounded">
