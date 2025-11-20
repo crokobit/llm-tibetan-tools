@@ -231,17 +231,17 @@ class DocumentParser {
 // ==========================================
 
 const FONT_SIZES = {
-  tibetan: 'text-4xl sm:text-5xl',
-  analysisMain: 'text-lg',
-  analysisSub: 'text-sm'
+  tibetan: 'tibetan-large',
+  analysisMain: 'analysis-main-text',
+  analysisSub: 'analysis-sub-text'
 };
 
 const POS_COLORS = {
-  n: 'border-red-500',
-  v: 'border-blue-500',
-  adj: 'border-green-500',
-  adv: 'border-purple-500',
-  other: 'border-gray-500'
+  n: 'pos-border-n',
+  v: 'pos-border-v',
+  adj: 'pos-border-adj',
+  adv: 'pos-border-adv',
+  other: 'pos-border-other'
 };
 
 // --- Helper Functions ---
@@ -263,10 +263,10 @@ const truncateDefinition = (def) => {
 
 const AnalysisLabel = ({ text, isSub }) => {
   if (!text) return null;
-  return <div className={`text-gray-600 ${isSub ? 'text-xs' : 'text-sm'} font-medium`}>{text}</div>
+  return <div className={`analysis-label ${isSub ? 'analysis-label-sub' : ''}`}>{text}</div>
 }
 
-const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset, highlightColor = 'bg-green-200') => {
+const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset, highlightColor = 'highlight-creating') => {
   const textStart = currentGlobalOffset;
   const textEnd = currentGlobalOffset + text.length;
 
@@ -320,7 +320,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
   }, [isAnyEditActive]);
 
   // Determine highlight color based on action type
-  const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'bg-green-200';
+  const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'highlight-creating';
 
   // --- Compound Mode Logic (Grid Layout) ---
   const subUnits = (nestedData && nestedData.length > 0) ? nestedData : (supplementaryData && supplementaryData.length > 0 ? supplementaryData : null);
@@ -331,7 +331,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
     return (
       <div
         data-indices={indices ? JSON.stringify(indices) : undefined}
-        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group rounded transition-colors duration-200 p-1 ${isEditingMainAnalysis ? 'bg-blue-200' : ''}`}
+        className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''}`}
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
         onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
@@ -349,7 +349,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
           return (
             <div
               key={`tib-${i}`}
-              className={`text-center px-0.5 rounded-t transition-colors ${i === hoveredSubIndex && !isAnyEditActive ? 'bg-blue-200' : ''} ${isThisSubWordEditing ? 'bg-blue-200' : ''}`}
+              className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
               onClick={(e) => {
                 // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
                 if (!isTsheg) {
@@ -359,7 +359,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 }
               }}
             >
-              <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
+              <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
                 {isCreatingSub && editingTarget && editingTarget.creationDetails
                   ? renderHighlightedText(
                     u.original,
@@ -377,17 +377,17 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
         {/* --- Row 2: Main Analysis (Spans all cols) --- */}
         <div
           style={{ gridColumn: `1 / span ${subUnits.length}` }}
-          className="text-center w-full mb-1"
+          className="main-analysis-box"
           onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
         >
           {/* Main Analysis Underline */}
-          <div className={`w-full border-b-[4px] ${mainBorderColor} mb-1`}></div>
+          <div className={`main-analysis-underline ${mainBorderColor}`}></div>
 
           {/* Main Analysis Text */}
           <div className="flex flex-col items-center">
             <AnalysisLabel text={analysis.root} isSub={isNested} />
-            {analysis.tense && <span className="text-xs text-gray-400 italic">({analysis.tense})</span>}
-            <div className={`text-gray-500 ${isNested ? 'text-[10px]' : 'text-xs'} truncate max-w-full`}>
+            {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
+            <div className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
               {displayDef}
             </div>
           </div>
@@ -402,7 +402,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
 
           const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
           const subBorderColor = POS_COLORS[subPosKey] || POS_COLORS.other;
-          const subBgColor = subBorderColor.replace('border-', 'bg-');
+          const subBgColor = subBorderColor.replace('pos-border-', 'pos-bg-');
           const subDef = truncateDefinition(u.analysis?.definition);
 
           const isAnalyzed = !!u.analysis;
@@ -414,20 +414,20 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
           return (
             <div
               key={`sub-${i}`}
-              className={`flex flex-col items-center w-full group/sub rounded transition-colors duration-200 ${isThisSubEditing ? 'bg-blue-200' : ''} ${isAnalyzed ? `bg-white ${!isAnyEditActive ? 'hover:bg-blue-200' : ''} cursor-pointer` : ''}`}
+              className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
               onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
               onMouseLeave={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(null) : undefined}
               onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
             >
               {/* Sub Analysis Underline (Colored Bar) */}
               {u.analysis && (
-                <div className={`w-full h-[3px] ${subBgColor} mb-0.5 opacity-80 group-hover/sub:opacity-100`}></div>
+                <div className={`sub-analysis-underline ${subBgColor}`}></div>
               )}
 
               {/* Sub Analysis Text */}
               <div className="text-center w-full rounded">
-                <div className="text-[10px] font-medium text-gray-600">{u.analysis?.root}</div>
-                <div className="text-[10px] text-gray-500 truncate w-full leading-tight">
+                <div className="analysis-label-sub text-gray-600 font-medium">{u.analysis?.root}</div>
+                <div className="analysis-def-sub text-gray-500 truncate w-full leading-tight">
                   {subDef}
                 </div>
               </div>
@@ -439,20 +439,20 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
   }
 
   // --- Simple Mode (Standard Card) ---
-  const borderClass = `border-b-[4px] ${mainBorderColor}`;
+  const borderClass = `main-analysis-underline ${mainBorderColor}`;
 
   return (
     <div
       data-indices={indices ? JSON.stringify(indices) : undefined}
-      className={`inline-flex flex-col items-center mx-1 align-top cursor-pointer group transition-all duration-200 ${isEditingExisting ? 'bg-blue-200 rounded p-2' : 'hover:-translate-y-1'}`}
+      className={`word-card ${isEditingExisting ? 'editing' : ''}`}
       onClick={(e) => {
         e.stopPropagation();
         onClick(e, unit, null, null);
       }}
     >
       {/* Main Tibetan Word */}
-      <div className={`px-1 ${borderClass} ${!isCreatingSub && !isEditingExisting && !isAnyEditActive ? 'group-hover:bg-blue-50' : ''} rounded-t transition-colors`}>
-        <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
+      <div className={`tibetan-word-box ${borderClass} ${!isCreatingSub && !isEditingExisting && !isAnyEditActive ? 'allow-hover' : ''}`}>
+        <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
           {isCreatingSub && editingTarget && editingTarget.creationDetails
             ? renderHighlightedText(
               original,
@@ -466,10 +466,10 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
       </div>
 
       {/* Main Analysis */}
-      <div className="text-center mt-1 max-w-[120px]">
+      <div className="main-analysis-box">
         <AnalysisLabel text={analysis.root} isSub={isNested} />
-        {analysis.tense && <span className="text-xs text-gray-400 italic">({analysis.tense})</span>}
-        <div className={`text-gray-500 ${isNested ? 'text-[10px]' : 'text-xs'} truncate w-full`}>
+        {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
+        <div className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
           {displayDef}
         </div>
       </div>
@@ -486,11 +486,11 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
       editingTarget.indices.unitIdx === indices.unitIdx;
 
     const shouldHighlight = isEditingTarget && editingTarget.isCreating && editingTarget.creationDetails;
-    const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'bg-green-200';
+    const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'highlight-creating';
 
     return (
       <span
-        className={`inline-block mx-0.5 font-serif ${isNested ? 'text-xl' : FONT_SIZES.tibetan} cursor-text`}
+        className={`inline-block mx-0.5 tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan} cursor-text`}
         data-indices={indices ? JSON.stringify(indices) : undefined}
         onClick={(e) => e.stopPropagation()}
       >
@@ -552,23 +552,23 @@ const PosSelect = ({ value, onChange }) => {
   }, []);
 
   const selectedOption = options.find(o => o.value === value) || options[0];
-  const selectedBg = selectedOption.color.replace('border-', 'bg-');
+  const selectedBg = selectedOption.color.replace('pos-border-', 'pos-bg-');
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full border rounded p-2 text-left bg-white flex items-center justify-between hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="form-select-button"
       >
         <span className="text-sm">{selectedOption.label}</span>
         <div className={`w-3 h-3 rounded-full ${selectedBg}`}></div>
       </button>
 
       {isOpen && (
-        <div className="absolute z-20 w-full bg-white border rounded shadow-lg mt-1 max-h-60 overflow-auto">
+        <div className="form-select-dropdown">
           {options.map((opt) => {
-            const barColor = opt.color.replace('border-', 'bg-');
+            const barColor = opt.color.replace('pos-border-', 'pos-bg-');
             return (
               <div
                 key={opt.value}
@@ -576,7 +576,7 @@ const PosSelect = ({ value, onChange }) => {
                   onChange(opt.value);
                   setIsOpen(false);
                 }}
-                className="p-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
+                className="form-select-option"
               >
                 <div className="text-sm">{opt.label}</div>
                 <div className={`w-3 h-3 rounded-full ${barColor}`}></div>
@@ -688,15 +688,15 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
   return (
     <div
       ref={popoverRef}
-      className="absolute z-50 bg-white rounded shadow-xl w-64 flex flex-col border border-gray-300 text-sm"
+      className="popover-container"
       style={{ top: coords.top, left: coords.left, opacity: coords.opacity }}
     >
       {/* Arrow */}
       <div
-        className={`absolute w-3 h-3 bg-white border-l border-t border-gray-300 transform rotate-45 ${placement === 'bottom' ? '-top-1.5 left-4' : '-bottom-1.5 left-4 border-l-0 border-t-0 border-r border-b'}`}
+        className={`popover-arrow ${placement === 'bottom' ? 'bottom' : 'top'}`}
       ></div>
 
-      <div className="p-3 space-y-2">
+      <div className="popover-content">
         {/* Parent Selection Dropdown - Hidden for now */}
         {false && isCreating && possibleParents && possibleParents.length > 1 && (
           <div className="mb-2">
@@ -717,7 +717,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
         <div className="flex gap-2">
           <div className="flex-1">
             <input
-              className="w-full border rounded px-2 py-1 bg-gray-50 focus:bg-white"
+              className="form-input"
               value={formData.root}
               onChange={e => setFormData({ ...formData, root: e.target.value })}
               placeholder="Root"
@@ -731,7 +731,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
         {/* Row 2: Volls (Optional) */}
         <div>
           <input
-            className="w-full border rounded px-2 py-1 text-xs text-gray-600 placeholder-gray-400"
+            className="form-input text-xs"
             value={formData.volls}
             onChange={e => setFormData({ ...formData, volls: e.target.value })}
             placeholder="Full form (optional)"
@@ -745,7 +745,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
               <button
                 key={t}
                 onClick={() => toggleTense(t)}
-                className={`px-1.5 py-0.5 text-[10px] rounded border ${formData.tense.includes(t) ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-50 text-gray-500'}`}
+                className={`tense-button ${formData.tense.includes(t) ? 'active' : 'inactive'}`}
               >
                 {t}
               </button>
@@ -756,7 +756,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
         {/* Row 4: Definition */}
         <div>
           <textarea
-            className="w-full border rounded px-2 py-1 text-xs"
+            className="form-input text-xs"
             rows={2}
             value={formData.definition}
             onChange={e => setFormData({ ...formData, definition: e.target.value })}
@@ -766,11 +766,11 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 bg-gray-50 border-t flex justify-between items-center rounded-b">
+      <div className="popover-footer">
         {!isCreating ? (
-          <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs">Delete</button>
+          <button onClick={onDelete} className="btn-delete">Delete</button>
         ) : <span></span>}
-        <button onClick={handleSave} className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 font-medium">Save</button>
+        <button onClick={handleSave} className="btn-save">Save</button>
       </div>
     </div>
   );
@@ -852,7 +852,7 @@ export default function TibetanReader() {
       indices: { blockIdx, lineIdx, unitIdx, subIndex, subType },
       data: subUnit,
       isCreating: false,
-      highlightColor: 'bg-blue-200',
+      highlightColor: 'highlight-editing',
       creationDetails: {
         selectedText: subUnit.original,
         startOffset: startOffset,
@@ -955,7 +955,7 @@ export default function TibetanReader() {
         indices: { blockIdx, lineIdx, unitIdx: startUnitIdx, subIndex: exactMatchSubIndex, subType: exactMatchSubType },
         data: exactMatchSubUnit,
         isCreating: false,
-        highlightColor: 'bg-blue-200',
+        highlightColor: 'highlight-editing',
         creationDetails: {
           selectedText: exactMatchSubUnit.original,
           startOffset: subStartOffset,
@@ -974,7 +974,7 @@ export default function TibetanReader() {
         indices: { blockIdx, lineIdx, unitIdx: startUnitIdx },
         data: exactMatchUnit,
         isCreating: false,
-        highlightColor: 'bg-blue-200',
+        highlightColor: 'highlight-editing',
         creationDetails: {
           selectedText: exactMatchUnit.original,
           startOffset: 0,
@@ -1014,7 +1014,7 @@ export default function TibetanReader() {
       indices: { blockIdx, lineIdx, unitIdx: startUnitIdx, endUnitIdx },
       data: selectedText,
       isCreating: true,
-      highlightColor: 'bg-green-200',
+      highlightColor: 'highlight-creating',
       possibleParents,
       creationDetails: {
         selectedText,
@@ -1180,18 +1180,17 @@ export default function TibetanReader() {
     }).join('\n\n');
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" onMouseUp={handleSelection}>
-      {/* Custom CSS for dynamic selection highlight */}
-      <style>{`
-        .tibetan-content ::selection {
-          background-color: ${editingTarget && editingTarget.isCreating ? 'rgb(187, 247, 208)' : 'rgb(191, 219, 254)'}; /* green-200 for creating, blue-200 for editing */
-        }
-      `}</style>
-      <main className="max-w-5xl mx-auto p-4 sm:p-8">
+  // Determine content class for selection styling
+  const contentSelectionClass = editingTarget
+    ? (editingTarget.isCreating ? 'creating-mode' : 'editing-mode')
+    : '';
 
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">藏文分析閱讀器 (React版)</h1>
+  return (
+    <div className="app-root" onMouseUp={handleSelection}>
+      <main className="main-container">
+
+        <div className="header-container">
+          <h1 className="app-title">藏文分析閱讀器 (React版)</h1>
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -1200,12 +1199,12 @@ export default function TibetanReader() {
                 id="debugMode"
                 checked={debugMode}
                 onChange={(e) => setDebugMode(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                className="w-4 h-4"
               />
-              <label htmlFor="debugMode" className="text-sm text-gray-600 cursor-pointer select-none">Debug Mode</label>
+              <label htmlFor="debugMode" className="debug-mode-label">Debug Mode</label>
             </div>
 
-            <label className={`cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition ${!isMammothLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <label className={`file-upload-label ${!isMammothLoaded ? 'disabled' : ''}`}>
               <span>{isMammothLoaded ? '讀取 Word 檔案 (.docx)' : '載入核心中...'}</span>
               <input
                 type="file"
@@ -1218,18 +1217,18 @@ export default function TibetanReader() {
           </div>
         </div>
 
-        <div ref={contentRef} className="bg-white shadow-lg rounded-xl p-8 min-h-[500px] tibetan-content">
-          {loading && <div className="text-center text-gray-500 mt-10">正在解析文件...</div>}
+        <div ref={contentRef} className={`content-card tibetan-content ${contentSelectionClass}`}>
+          {loading && <div className="loading-text">正在解析文件...</div>}
 
           {!loading && documentData.length === 0 && (
-            <div className="text-center text-gray-400 mt-20 border-2 border-dashed border-gray-200 rounded-lg p-10">
+            <div className="empty-state">
               請上傳 .docx 檔案以開始分析。<br />
               <span className="text-sm mt-2 inline-block">您可以在未分析的文字上選取並建立新的註釋。</span>
             </div>
           )}
 
           {documentData.map((block, bIdx) => (
-            <div key={bIdx} className="mb-12 pb-8 border-b border-gray-100 last:border-0">
+            <div key={bIdx} className="block-container">
               {block.lines.map((line, lIdx) => (
                 <LineRenderer
                   key={lIdx}
@@ -1246,19 +1245,19 @@ export default function TibetanReader() {
         </div>
 
         {debugMode && (
-          <div className="mt-8 p-6 bg-gray-900 text-green-400 rounded-xl shadow-lg overflow-hidden">
-            <h3 className="text-white font-bold mb-4 border-b border-gray-700 pb-2 flex justify-between items-center">
+          <div className="debug-container">
+            <h3 className="debug-header">
               <span>Debug: Raw Text & Analysis</span>
               <button
                 onClick={() => navigator.clipboard.writeText(generateRawOutput())}
-                className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-200 transition-colors"
+                className="btn-copy"
               >
                 Copy to Clipboard
               </button>
             </h3>
             <textarea
               readOnly
-              className="w-full h-96 bg-gray-800 p-4 rounded font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="debug-textarea"
               value={generateRawOutput()}
             />
           </div>
@@ -1275,8 +1274,6 @@ export default function TibetanReader() {
         possibleParents={editingTarget ? editingTarget.possibleParents : []}
         anchorRect={anchorRect}
       />
-
-      {/* ChoicePopover removed */}
     </div>
   );
 }
