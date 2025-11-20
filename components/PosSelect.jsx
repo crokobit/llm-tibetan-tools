@@ -31,7 +31,10 @@ const PosSelect = ({ value, onChange }) => {
         <div className="relative" ref={dropdownRef}>
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
                 className="form-select-button"
             >
                 <span className="text-sm">{selectedOption.label}</span>
@@ -45,7 +48,8 @@ const PosSelect = ({ value, onChange }) => {
                         return (
                             <div
                                 key={opt.value}
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.stopPropagation();
                                     onChange(opt.value);
                                     setIsOpen(false);
                                 }}
