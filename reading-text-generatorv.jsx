@@ -322,157 +322,127 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
   // Determine highlight color based on action type
   const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'highlight-creating';
 
-  // --- Compound Mode Logic (Grid Layout) ---
-  const subUnits = (nestedData && nestedData.length > 0) ? nestedData : (supplementaryData && supplementaryData.length > 0 ? supplementaryData : null);
+  // --- Unified Grid Layout ---
+  let subUnits = (nestedData && nestedData.length > 0) ? nestedData : (supplementaryData && supplementaryData.length > 0 ? supplementaryData : null);
   const subType = nestedData && nestedData.length > 0 ? 'nested' : 'supplementary';
+  const hasSubAnalysis = !!subUnits;
 
-  if (subUnits) {
-    let currentGlobalOffset = 0; // Track offset for highlighting
-    return (
-      <div
-        data-indices={indices ? JSON.stringify(indices) : undefined}
-        className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''}`}
-        style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
-        // Clicking background selects the main unit
-        onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
-      >
-        {/* --- Row 1: Tibetan Sub-Words (The "Main Word") --- */}
-        {subUnits.map((u, i) => {
-          // Check if this sub-unit is just a tsheg
-          const isTsheg = u.original.trim() === '་';
-          const myOffset = currentGlobalOffset;
-          currentGlobalOffset += u.original.length;
-
-          // Check if this specific sub-word is being edited
-          const isThisSubWordEditing = isEditingExisting && editingTarget.indices.subIndex === i;
-
-          return (
-            <div
-              key={`tib-${i}`}
-              className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
-              onClick={(e) => {
-                // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
-                if (!isTsheg) {
-                  e.stopPropagation();
-                  // User request: Clicking the main word (Tibetan text) should enter the word edit (main), not the compound edit (sub).
-                  onClick(e, unit, null, null);
-                }
-              }}
-            >
-              <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
-                {isCreatingSub && editingTarget && editingTarget.creationDetails
-                  ? renderHighlightedText(
-                    u.original,
-                    editingTarget.creationDetails.startOffset,
-                    editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-                    myOffset,
-                    highlightColor
-                  )
-                  : u.original}
-              </span>
-            </div>
-          );
-        })}
-
-        {/* --- Row 2: Main Analysis (Spans all cols) --- */}
-        <div
-          style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
-          className="main-analysis-box"
-          onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
-        >
-          {/* Main Analysis Underline */}
-          <div className={`main-analysis-underline ${mainBorderColor}`}></div>
-
-          {/* Main Analysis Text */}
-          <div className="flex flex-col items-center">
-            <AnalysisLabel text={analysis.root} isSub={isNested} />
-            {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
-            <div className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
-              {displayDef}
-            </div>
-          </div>
-        </div>
-
-        {/* --- Row 3: Sub Analysis (Aligned cols) --- */}
-        {subUnits.map((u, i) => {
-          // If tsheg, return empty cell to maintain grid structure but show nothing
-          if (u.original.trim() === '་') {
-            return <div key={`sub-${i}`} />;
-          }
-
-          const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
-          const subBorderColor = POS_COLORS[subPosKey] || POS_COLORS.other;
-          const subBgColor = subBorderColor.replace('pos-border-', 'pos-bg-');
-          const subDef = truncateDefinition(u.analysis?.definition);
-
-          const isAnalyzed = !!u.analysis;
-
-          // Check if this specific sub-analysis is being edited
-          const isThisSubEditing = isEditingExisting &&
-            editingTarget.indices.subIndex === i;
-
-          return (
-            <div
-              key={`sub-${i}`}
-              className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
-              onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
-              onMouseLeave={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(null) : undefined}
-              onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
-            >
-              {/* Sub Analysis Underline (Colored Bar) */}
-              {u.analysis && (
-                <div className={`sub-analysis-underline ${subBgColor}`}></div>
-              )}
-
-              {/* Sub Analysis Text */}
-              <div className="text-center w-full rounded">
-                <div className="analysis-label-sub text-gray-600 font-medium">{u.analysis?.root}</div>
-                <div className="analysis-def-sub text-gray-500 truncate w-full leading-tight">
-                  {subDef}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+  // If no sub-units, create a synthetic one for the main word
+  if (!subUnits) {
+    subUnits = [{ original: unit.original, analysis: null }];
   }
 
-  // --- Simple Mode (Standard Card) ---
-  const borderClass = `main-analysis-underline ${mainBorderColor}`;
+  let currentGlobalOffset = 0; // Track offset for highlighting
 
   return (
     <div
       data-indices={indices ? JSON.stringify(indices) : undefined}
-      className={`word-card ${isEditingExisting ? 'editing' : ''}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(e, unit, null, null);
-      }}
+      className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''}`}
+      style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
+      // Clicking background selects the main unit
+      onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
     >
-      {/* Main Tibetan Word */}
-      <div className={`tibetan-word-box ${borderClass} ${!isCreatingSub && !isEditingExisting && !isAnyEditActive ? 'allow-hover' : ''}`}>
-        <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
-          {isCreatingSub && editingTarget && editingTarget.creationDetails
-            ? renderHighlightedText(
-              original,
-              editingTarget.creationDetails.startOffset,
-              editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-              0,
-              highlightColor
-            )
-            : original}
-        </span>
-      </div>
+      {/* --- Row 1: Tibetan Sub-Words (The "Main Word") --- */}
+      {subUnits.map((u, i) => {
+        // Check if this sub-unit is just a tsheg
+        const isTsheg = u.original.trim() === '་';
+        const myOffset = currentGlobalOffset;
+        currentGlobalOffset += u.original.length;
 
-      {/* Main Analysis */}
-      <div className="main-analysis-box">
-        <AnalysisLabel text={analysis.root} isSub={isNested} />
-        {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
-        <div className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
-          {displayDef}
+        // Check if this specific sub-word is being edited
+        const isThisSubWordEditing = isEditingExisting && editingTarget.indices.subIndex === i;
+
+        return (
+          <div
+            key={`tib-${i}`}
+            className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
+            onClick={(e) => {
+              // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
+              if (!isTsheg && hasSubAnalysis) {
+                e.stopPropagation();
+                // User request: Clicking the main word (Tibetan text) should enter the word edit (main), not the compound edit (sub).
+                onClick(e, unit, null, null);
+              } else if (!hasSubAnalysis) {
+                // For simple words, let it bubble to main unit (handled by container onClick)
+                // or explicitly call it here if needed, but container handles it.
+              }
+            }}
+          >
+            <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
+              {isCreatingSub && editingTarget && editingTarget.creationDetails
+                ? renderHighlightedText(
+                  u.original,
+                  editingTarget.creationDetails.startOffset,
+                  editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+                  myOffset,
+                  highlightColor
+                )
+                : u.original}
+            </span>
+          </div>
+        );
+      })}
+
+      {/* --- Row 2: Main Analysis (Spans all cols) --- */}
+      <div
+        style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
+        className="main-analysis-box"
+        onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
+      >
+        {/* Main Analysis Underline */}
+        <div className={`main-analysis-underline ${mainBorderColor}`}></div>
+
+        {/* Main Analysis Text */}
+        <div className="flex flex-col items-center">
+          <AnalysisLabel text={analysis.root} isSub={isNested} />
+          {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
+          <div className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
+            {displayDef}
+          </div>
         </div>
       </div>
+
+      {/* --- Row 3: Sub Analysis (Aligned cols) --- */}
+      {hasSubAnalysis && subUnits.map((u, i) => {
+        // If tsheg, return empty cell to maintain grid structure but show nothing
+        if (u.original.trim() === '་') {
+          return <div key={`sub-${i}`} />;
+        }
+
+        const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
+        const subBorderColor = POS_COLORS[subPosKey] || POS_COLORS.other;
+        const subBgColor = subBorderColor.replace('pos-border-', 'pos-bg-');
+        const subDef = truncateDefinition(u.analysis?.definition);
+
+        const isAnalyzed = !!u.analysis;
+
+        // Check if this specific sub-analysis is being edited
+        const isThisSubEditing = isEditingExisting &&
+          editingTarget.indices.subIndex === i;
+
+        return (
+          <div
+            key={`sub-${i}`}
+            className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
+            onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
+            onMouseLeave={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(null) : undefined}
+            onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
+          >
+            {/* Sub Analysis Underline (Colored Bar) */}
+            {u.analysis && (
+              <div className={`sub-analysis-underline ${subBgColor}`}></div>
+            )}
+
+            {/* Sub Analysis Text */}
+            <div className="text-center w-full rounded">
+              <div className="analysis-label-sub text-gray-600 font-medium">{u.analysis?.root}</div>
+              <div className="analysis-def-sub text-gray-500 truncate w-full leading-tight">
+                {subDef}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
