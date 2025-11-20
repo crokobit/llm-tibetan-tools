@@ -555,50 +555,44 @@ export default function TibetanReader() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8 font-sans" onClick={() => {
+        <div className="app-background" onClick={() => {
             if (!ignoreClickRef.current) {
                 setEditingTarget(null);
             }
             ignoreClickRef.current = false;
         }}>
-            <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden">
+            <div className="main-card">
                 {/* Header */}
-                <div className="bg-blue-600 text-white p-6 shadow-md">
-                    <h1 className="text-3xl font-bold mb-2">Tibetan Text Analyzer</h1>
-                    <p className="text-blue-100">Upload a .docx file or paste text to begin analysis</p>
+                <div className="app-header">
+                    <h1 className="app-header-title">Tibetan Text Analyzer</h1>
+                    <p className="app-header-subtitle">Upload a .docx file or paste text to begin analysis</p>
                 </div>
 
                 {/* Toolbar */}
-                <div className="p-4 border-b bg-gray-50 flex gap-4 items-center sticky top-0 z-10">
+                <div className="toolbar-container">
                     <input
                         type="file"
                         accept=".docx"
                         onChange={handleFileUpload}
-                        className="block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100
-            "
+                        className="file-input-custom"
                     />
                     <button
                         onClick={downloadOutput}
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition shadow-sm"
+                        className="btn-export"
                     >
                         Export Text
                     </button>
                 </div>
 
                 {/* Content Area */}
-                <div className="p-8 min-h-[500px]" ref={contentRef}>
+                <div className="content-area" ref={contentRef}>
                     {loading ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                        <div className="loading-container">
+                            <div className="loading-spinner"></div>
                         </div>
                     ) : (
                         documentData.map((block, blockIdx) => (
-                            <div key={blockIdx} className="mb-12 pb-8 border-b border-gray-200 last:border-0">
+                            <div key={blockIdx} className="block-layout">
                                 {block.lines.map((line, lineIdx) => (
                                     <LineRenderer
                                         key={lineIdx}
