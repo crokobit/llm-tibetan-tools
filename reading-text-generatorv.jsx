@@ -310,6 +310,14 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
 
   const isCreatingSub = isEditingTarget && editingTarget.isCreating;
   const isEditingExisting = isEditingTarget && !editingTarget.isCreating;
+  const isEditingMainAnalysis = isEditingExisting && (editingTarget.indices.subIndex === null || editingTarget.indices.subIndex === undefined);
+
+  // Reset hoveredSubIndex when edit mode closes
+  useEffect(() => {
+    if (!isAnyEditActive) {
+      setHoveredSubIndex(null);
+    }
+  }, [isAnyEditActive]);
 
   // Determine highlight color based on action type
   const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'bg-green-200';
@@ -323,7 +331,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
     return (
       <div
         data-indices={indices ? JSON.stringify(indices) : undefined}
-        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${isEditingExisting ? 'bg-blue-200' : ''} ${hoveredSubIndex === null && !isCreatingSub && !isAnyEditActive ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
+        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group rounded transition-colors duration-200 p-1 ${isEditingMainAnalysis ? 'bg-blue-200' : ''}`}
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
         onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
@@ -335,10 +343,13 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
           const myOffset = currentGlobalOffset;
           currentGlobalOffset += u.original.length;
 
+          // Check if this specific sub-word is being edited
+          const isThisSubWordEditing = isEditingExisting && editingTarget.indices.subIndex === i;
+
           return (
             <div
               key={`tib-${i}`}
-              className={`text-center px-0.5 rounded-t transition-colors ${i === hoveredSubIndex ? 'bg-blue-200' : ''}`}
+              className={`text-center px-0.5 rounded-t transition-colors ${i === hoveredSubIndex && !isAnyEditActive ? 'bg-blue-200' : ''} ${isThisSubWordEditing ? 'bg-blue-200' : ''}`}
               onClick={(e) => {
                 // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
                 if (!isTsheg) {
@@ -404,8 +415,8 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             <div
               key={`sub-${i}`}
               className={`flex flex-col items-center w-full group/sub rounded transition-colors duration-200 ${isThisSubEditing ? 'bg-blue-200' : ''} ${isAnalyzed ? `bg-white ${!isAnyEditActive ? 'hover:bg-blue-200' : ''} cursor-pointer` : ''}`}
-              onMouseEnter={isAnalyzed ? () => setHoveredSubIndex(i) : undefined}
-              onMouseLeave={isAnalyzed ? () => setHoveredSubIndex(null) : undefined}
+              onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
+              onMouseLeave={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(null) : undefined}
               onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
             >
               {/* Sub Analysis Underline (Colored Bar) */}
@@ -1171,10 +1182,10 @@ export default function TibetanReader() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" onMouseUp={handleSelection}>
-      {/* Custom CSS for blue selection highlight */}
+      {/* Custom CSS for dynamic selection highlight */}
       <style>{`
         .tibetan-content ::selection {
-          background-color: rgb(191, 219, 254); /* bg-blue-200 */
+          background-color: ${editingTarget && editingTarget.isCreating ? 'rgb(187, 247, 208)' : 'rgb(191, 219, 254)'}; /* green-200 for creating, blue-200 for editing */
         }
       `}</style>
       <main className="max-w-5xl mx-auto p-4 sm:p-8">
