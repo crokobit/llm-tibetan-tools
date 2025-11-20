@@ -5,7 +5,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tibetan Reader</title>
-    <link rel="stylesheet" href="styles.css">
+    <script>
+        // 🚀 IMPORTANT: Update this version number when deploying to production!
+        const CSS_VERSION = '1.0.0';
+
+        // Auto-detect development mode (localhost or 127.0.0.1)
+        const isDev = window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1' ||
+            window.location.hostname === '';
+
+        if (isDev) {
+            // Development mode: Disable cache and use timestamp
+            document.write('<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">');
+            document.write('<meta http-equiv="Pragma" content="no-cache">');
+            document.write('<meta http-equiv="Expires" content="0">');
+            document.write('<link rel="stylesheet" href="styles.css?t=' + Date.now() + '">');
+            console.log('🔧 Development mode: CSS caching disabled');
+        } else {
+            // Production mode: Use version for cache busting
+            document.write('<link rel="stylesheet" href="styles.css?v=' + CSS_VERSION + '">');
+            console.log('🚀 Production mode: CSS version ' + CSS_VERSION);
+        }
+    </script>
 
     <!-- Import Map for React -->
     <script type="importmap">
