@@ -294,7 +294,7 @@ const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset
   );
 };
 
-const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) => {
+const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive }) => {
   const { analysis, original, nestedData, supplementaryData } = unit;
   const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
 
@@ -323,7 +323,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
     return (
       <div
         data-indices={indices ? JSON.stringify(indices) : undefined}
-        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${hoveredSubIndex === null && !isCreatingSub ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
+        className={`inline-grid gap-x-0.5 mx-1 align-top cursor-pointer group ${isEditingExisting ? 'bg-blue-200' : ''} ${hoveredSubIndex === null && !isCreatingSub && !isAnyEditActive ? 'hover:bg-blue-50' : ''} rounded transition-colors duration-200 p-1`}
         style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
         // Clicking background selects the main unit
         onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
@@ -349,7 +349,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
               }}
             >
               <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
-                {(isCreatingSub || isEditingExisting) && editingTarget && editingTarget.creationDetails
+                {isCreatingSub && editingTarget && editingTarget.creationDetails
                   ? renderHighlightedText(
                     u.original,
                     editingTarget.creationDetails.startOffset,
@@ -396,10 +396,14 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
 
           const isAnalyzed = !!u.analysis;
 
+          // Check if this specific sub-analysis is being edited
+          const isThisSubEditing = isEditingExisting &&
+            editingTarget.indices.subIndex === i;
+
           return (
             <div
               key={`sub-${i}`}
-              className={`flex flex-col items-center w-full group/sub rounded transition-colors duration-200 ${isAnalyzed ? 'bg-white hover:bg-blue-200 cursor-pointer' : ''}`}
+              className={`flex flex-col items-center w-full group/sub rounded transition-colors duration-200 ${isThisSubEditing ? 'bg-blue-200' : ''} ${isAnalyzed ? `bg-white ${!isAnyEditActive ? 'hover:bg-blue-200' : ''} cursor-pointer` : ''}`}
               onMouseEnter={isAnalyzed ? () => setHoveredSubIndex(i) : undefined}
               onMouseLeave={isAnalyzed ? () => setHoveredSubIndex(null) : undefined}
               onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
@@ -429,16 +433,16 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
   return (
     <div
       data-indices={indices ? JSON.stringify(indices) : undefined}
-      className={`inline-flex flex-col items-center mx-1 align-top cursor-pointer group transition-all duration-200 hover:-translate-y-1`}
+      className={`inline-flex flex-col items-center mx-1 align-top cursor-pointer group transition-all duration-200 ${isEditingExisting ? 'bg-blue-200 rounded p-2' : 'hover:-translate-y-1'}`}
       onClick={(e) => {
         e.stopPropagation();
         onClick(e, unit, null, null);
       }}
     >
       {/* Main Tibetan Word */}
-      <div className={`px-1 ${borderClass} ${!isCreatingSub && !isEditingExisting ? 'group-hover:bg-blue-50' : ''} rounded-t transition-colors`}>
+      <div className={`px-1 ${borderClass} ${!isCreatingSub && !isEditingExisting && !isAnyEditActive ? 'group-hover:bg-blue-50' : ''} rounded-t transition-colors`}>
         <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
-          {(isCreatingSub || isEditingExisting) && editingTarget && editingTarget.creationDetails
+          {isCreatingSub && editingTarget && editingTarget.creationDetails
             ? renderHighlightedText(
               original,
               editingTarget.creationDetails.startOffset,
@@ -462,22 +466,39 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
   );
 };
 
-const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget }) => {
+const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEditActive }) => {
   if (unit.type === 'text') {
+    // Check if this text unit should have highlighting for new analysis creation
+    const isEditingTarget = editingTarget &&
+      editingTarget.indices.blockIdx === indices.blockIdx &&
+      editingTarget.indices.lineIdx === indices.lineIdx &&
+      editingTarget.indices.unitIdx === indices.unitIdx;
+
+    const shouldHighlight = isEditingTarget && editingTarget.isCreating && editingTarget.creationDetails;
+    const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'bg-green-200';
+
     return (
       <span
         className={`inline-block mx-0.5 font-serif ${isNested ? 'text-xl' : FONT_SIZES.tibetan} cursor-text`}
         data-indices={indices ? JSON.stringify(indices) : undefined}
         onClick={(e) => e.stopPropagation()}
       >
-        {unit.original}
+        {shouldHighlight
+          ? renderHighlightedText(
+            unit.original,
+            editingTarget.creationDetails.startOffset,
+            editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+            0,
+            highlightColor
+          )
+          : unit.original}
       </span>
     );
   }
-  return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} />;
+  return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} isAnyEditActive={isAnyEditActive} />;
 };
 
-const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick, editingTarget }) => {
+const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick, editingTarget, isAnyEditActive }) => {
   return (
     <div className="my-6 leading-relaxed text-justify">
       {line.units.map((unit, unitIdx) => (
@@ -487,6 +508,7 @@ const LineRenderer = ({ line, blockIdx, lineIdx, onUnitClick, editingTarget }) =
           indices={{ blockIdx, lineIdx, unitIdx }}
           onClick={(e, subUnit, subIndex, subType) => onUnitClick(e, blockIdx, lineIdx, unitIdx, subUnit, subIndex, subType)}
           editingTarget={editingTarget}
+          isAnyEditActive={isAnyEditActive}
         />
       ))}
     </div>
@@ -800,10 +822,31 @@ export default function TibetanReader() {
     const rect = event.currentTarget.getBoundingClientRect();
     setAnchorRect(rect);
 
+    // Calculate offset for sub-units if applicable
+    let startOffset = 0;
+    let parentUnit = null;
+
+    if (subIndex !== null && subIndex !== undefined) {
+      // This is a sub-analysis click
+      parentUnit = documentData[blockIdx].lines[lineIdx].units[unitIdx];
+      const list = subType === 'nested' ? parentUnit.nestedData : parentUnit.supplementaryData;
+
+      // Calculate offset
+      for (let i = 0; i < subIndex; i++) {
+        startOffset += list[i].original.length;
+      }
+    }
+
     setEditingTarget({
       indices: { blockIdx, lineIdx, unitIdx, subIndex, subType },
       data: subUnit,
-      isCreating: false
+      isCreating: false,
+      highlightColor: 'bg-blue-200',
+      creationDetails: {
+        selectedText: subUnit.original,
+        startOffset: startOffset,
+        fullText: parentUnit ? parentUnit.original : subUnit.original
+      }
     });
   };
 
@@ -1128,6 +1171,12 @@ export default function TibetanReader() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" onMouseUp={handleSelection}>
+      {/* Custom CSS for blue selection highlight */}
+      <style>{`
+        .tibetan-content ::selection {
+          background-color: rgb(191, 219, 254); /* bg-blue-200 */
+        }
+      `}</style>
       <main className="max-w-5xl mx-auto p-4 sm:p-8">
 
         <div className="flex justify-between items-center mb-8">
@@ -1158,7 +1207,7 @@ export default function TibetanReader() {
           </div>
         </div>
 
-        <div ref={contentRef} className="bg-white shadow-lg rounded-xl p-8 min-h-[500px]">
+        <div ref={contentRef} className="bg-white shadow-lg rounded-xl p-8 min-h-[500px] tibetan-content">
           {loading && <div className="text-center text-gray-500 mt-10">正在解析文件...</div>}
 
           {!loading && documentData.length === 0 && (
@@ -1178,6 +1227,7 @@ export default function TibetanReader() {
                   lineIdx={lIdx}
                   onUnitClick={handleUnitClick}
                   editingTarget={editingTarget}
+                  isAnyEditActive={!!editingTarget}
                 />
               ))}
             </div>
