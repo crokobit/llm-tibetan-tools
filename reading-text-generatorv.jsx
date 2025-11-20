@@ -266,7 +266,7 @@ const AnalysisLabel = ({ text, isSub }) => {
   return <div className={`text-gray-600 ${isSub ? 'text-xs' : 'text-sm'} font-medium`}>{text}</div>
 }
 
-const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset) => {
+const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset, highlightColor = 'bg-green-200') => {
   const textStart = currentGlobalOffset;
   const textEnd = currentGlobalOffset + text.length;
 
@@ -288,7 +288,7 @@ const renderHighlightedText = (text, startGlobal, endGlobal, currentGlobalOffset
   return (
     <>
       {before}
-      <span className="bg-green-200 rounded-sm">{mid}</span>
+      <span className={highlightColor}>{mid}</span>
       {after}
     </>
   );
@@ -309,6 +309,10 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
     editingTarget.indices.unitIdx === indices.unitIdx;
 
   const isCreatingSub = isEditingTarget && editingTarget.isCreating;
+  const isEditingExisting = isEditingTarget && !editingTarget.isCreating;
+
+  // Determine highlight color based on action type
+  const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'bg-green-200';
 
   // --- Compound Mode Logic (Grid Layout) ---
   const subUnits = (nestedData && nestedData.length > 0) ? nestedData : (supplementaryData && supplementaryData.length > 0 ? supplementaryData : null);
@@ -345,12 +349,13 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
               }}
             >
               <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
-                {isCreatingSub && editingTarget.creationDetails
+                {(isCreatingSub || isEditingExisting) && editingTarget && editingTarget.creationDetails
                   ? renderHighlightedText(
                     u.original,
                     editingTarget.creationDetails.startOffset,
                     editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-                    myOffset
+                    myOffset,
+                    highlightColor
                   )
                   : u.original}
               </span>
@@ -431,14 +436,15 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget }) =
       }}
     >
       {/* Main Tibetan Word */}
-      <div className={`px-1 ${borderClass} ${!isCreatingSub ? 'group-hover:bg-blue-50' : ''} rounded-t transition-colors`}>
+      <div className={`px-1 ${borderClass} ${!isCreatingSub && !isEditingExisting ? 'group-hover:bg-blue-50' : ''} rounded-t transition-colors`}>
         <span className={`font-serif ${isNested ? 'text-2xl' : FONT_SIZES.tibetan}`}>
-          {isCreatingSub && editingTarget.creationDetails
+          {(isCreatingSub || isEditingExisting) && editingTarget && editingTarget.creationDetails
             ? renderHighlightedText(
               original,
               editingTarget.creationDetails.startOffset,
               editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-              0
+              0,
+              highlightColor
             )
             : original}
         </span>
@@ -882,10 +888,25 @@ export default function TibetanReader() {
 
     // Case 1a: Exact match with sub-analysis -> Edit the sub-analysis
     if (exactMatchSubUnit) {
+      // Calculate offset for this sub-unit within the parent
+      let subStartOffset = 0;
+      const parentUnit = candidateParent;
+      if (parentUnit && parentUnit.nestedData) {
+        for (let i = 0; i < exactMatchSubIndex; i++) {
+          subStartOffset += parentUnit.nestedData[i].original.length;
+        }
+      }
+
       setEditingTarget({
         indices: { blockIdx, lineIdx, unitIdx: startUnitIdx, subIndex: exactMatchSubIndex, subType: exactMatchSubType },
         data: exactMatchSubUnit,
-        isCreating: false
+        isCreating: false,
+        highlightColor: 'bg-blue-200',
+        creationDetails: {
+          selectedText: exactMatchSubUnit.original,
+          startOffset: subStartOffset,
+          fullText: parentUnit ? parentUnit.original : exactMatchSubUnit.original
+        }
       });
       selection.removeAllRanges();
       ignoreClickRef.current = true;
@@ -898,7 +919,13 @@ export default function TibetanReader() {
       setEditingTarget({
         indices: { blockIdx, lineIdx, unitIdx: startUnitIdx },
         data: exactMatchUnit,
-        isCreating: false
+        isCreating: false,
+        highlightColor: 'bg-blue-200',
+        creationDetails: {
+          selectedText: exactMatchUnit.original,
+          startOffset: 0,
+          fullText: exactMatchUnit.original
+        }
       });
       selection.removeAllRanges();
       ignoreClickRef.current = true;
@@ -933,6 +960,7 @@ export default function TibetanReader() {
       indices: { blockIdx, lineIdx, unitIdx: startUnitIdx, endUnitIdx },
       data: selectedText,
       isCreating: true,
+      highlightColor: 'bg-green-200',
       possibleParents,
       creationDetails: {
         selectedText,
