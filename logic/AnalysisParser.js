@@ -1,0 +1,56 @@
+import RegexGrammar from './RegexGrammar.js';
+
+export default class AnalysisParser {
+    static parse(annotationString) {
+        let content = annotationString;
+
+        // Handle potential double bracketing if it exists, though regex should handle it
+        if (content.startsWith('[') && content.endsWith(']')) {
+            content = content.substring(1, content.length - 1);
+        }
+
+        if (content) content = content.split(';')[0].trim();
+
+        let volls = '', pos = 'other', tense = '', root = '', definition = '';
+
+        const match = content.match(RegexGrammar.ANALYSIS_CONTENT);
+
+        if (match) {
+            volls = match[1].trim();
+            pos = match[2];
+            tense = match[3] || '';
+            let rest = match[4].trim();
+
+            // Attempt to separate Root from Definition
+            // Assuming Root is Tibetan characters at the start
+            const tibetanWordMatch = rest.match(/^([\u0F00-\u0FFF]+)/);
+            if (tibetanWordMatch) {
+                root = tibetanWordMatch[1].trim();
+                definition = rest.substring(root.length).trim();
+            } else {
+                definition = rest;
+            }
+        } else {
+            // Fallback if regex doesn't match (e.g. no {})
+            definition = content.replace(/{[a-z0-9/\->|,]+}/i, '').trim();
+        }
+
+        return { volls, pos, root, tense, definition };
+    }
+
+    static serialize(analysisObj, originalWord) {
+        const { volls, root, pos, tense, definition } = analysisObj;
+
+        const bString = `${pos || 'other'}${tense ? ',' + tense : ''}`;
+        const c_and_d = `${root || ''} ${definition || ''}`.trim();
+
+        let internalString = '';
+        if (volls) {
+            internalString = `${volls}{${bString}} ${c_and_d}`;
+        } else {
+            internalString = `{${bString}} ${c_and_d}`;
+        }
+
+        return internalString.replace(/\s+/g, ' ').trim();
+    }
+}

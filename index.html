@@ -28,60 +28,112 @@
         import React from 'react';
         import { createRoot } from 'react-dom/client';
 
-        async function run() {
-            try {
-                // Fetch the JSX file
-                // Fetch the JSX file with cache busting
-                const res = await fetch(`./reading-text-generatorv.jsx?t=${Date.now()}`);
-                if (!res.ok) {
-                    throw new Error(`Failed to load JSX file: ${res.status} ${res.statusText}`);
+        // List of all files to load (relative to root, no leading ./)
+        const files = [
+            'utils/constants.js',
+            'utils/helpers.js',
+            'utils/renderHighlightedText.jsx',
+            'logic/RegexGrammar.js',
+            'logic/AnalysisParser.js',
+            'logic/DocumentParser.js',
+            'components/AnalysisLabel.jsx',
+            'components/PosSelect.jsx',
+            'components/EditPopover.jsx',
+            'components/WordCard.jsx',
+            'components/UnitRenderer.jsx',
+            'components/LineRenderer.jsx',
+            'App.jsx'
+        ];
+
+        // Helper to resolve relative paths like '../utils/constants.js' to 'utils/constants.js'
+        function resolveImportPath(baseFile, importPath) {
+            if (!importPath.startsWith('.')) return importPath; // Already bare or absolute
+
+            const stack = baseFile.split('/');
+            stack.pop(); // Remove filename, keep directory
+
+            const parts = importPath.split('/');
+            for (const part of parts) {
+                if (part === '.') continue;
+                if (part === '..') {
+                    if (stack.length > 0) stack.pop();
+                } else {
+                    stack.push(part);
                 }
-                const jsxCode = await res.text();
+            }
+            return stack.join('/');
+        }
 
-                // Transform JSX to JS
-                // We assume the JSX file uses 'import React from "react"' which matches our import map
-                const { code } = Babel.transform(jsxCode, {
-                    presets: ['react'],
-                    filename: 'reading-text-generatorv.jsx'
-                });
+        async function loadAndTransform() {
+            try {
+                const importMap = { imports: {} };
+                const fileContents = {};
 
-                // Create a Blob URL to import the transformed code as a module
-                const blob = new Blob([code], { type: 'text/javascript' });
-                const url = URL.createObjectURL(blob);
+                // 1. Fetch all files first
+                for (const file of files) {
+                    const res = await fetch(`./${file}?t=${Date.now()}`);
+                    if (!res.ok) throw new Error(`Failed to load ${file}`);
+                    fileContents[file] = await res.text();
+                }
 
-                // Import the component
-                const module = await import(url);
+                // 2. Transform code and rewrite imports
+                for (const file of files) {
+                    let code = fileContents[file];
+
+                    // Rewrite relative imports to bare specifiers based on our file list
+                    // Regex to match: import ... from '...' or import '...'
+                    // We assume single quotes or double quotes
+                    code = code.replace(/(import\s+(?:[\s\S]*?from\s+)?['"])([\.\/][^'"]+)(['"])/g, (match, prefix, path, suffix) => {
+                        const resolved = resolveImportPath(file, path);
+                        // Check if this resolved path is in our file list (ignoring extension mismatch if any, but we use full names)
+                        // We just use the resolved path as the new specifier
+                        return `${prefix}${resolved}${suffix}`;
+                    });
+
+                    // Transform JSX/ES6
+                    const transformed = Babel.transform(code, {
+                        presets: ['react'],
+                        filename: file,
+                        sourceMaps: 'inline'
+                    }).code;
+
+                    // Create Blob URL
+                    const blob = new Blob([transformed], { type: 'text/javascript' });
+                    const url = URL.createObjectURL(blob);
+
+                    // Map the "bare specifier" (the file path) to the Blob URL
+                    importMap.imports[file] = url;
+                }
+
+                // 3. Inject the dynamic import map
+                const mapScript = document.createElement('script');
+                mapScript.type = 'importmap';
+                // Merge with existing map (React)
+                const existingMap = JSON.parse(document.querySelector('script[type="importmap"]').textContent);
+                const finalMap = {
+                    imports: {
+                        ...existingMap.imports,
+                        ...importMap.imports
+                    }
+                };
+                mapScript.textContent = JSON.stringify(finalMap);
+                document.head.appendChild(mapScript);
+
+                // 4. Import the main App
+                // The App.jsx is mapped to 'App.jsx' in our map
+                const module = await import(importMap.imports['App.jsx']);
                 const TibetanReader = module.default;
 
-                // Render the component
                 const root = createRoot(document.getElementById('root'));
                 root.render(React.createElement(TibetanReader));
 
             } catch (err) {
-                console.error("Error rendering app:", err);
-                document.getElementById('root').innerHTML = `
-                    <div class="error-container">
-                        <h2 class="error-title">Error Loading Application</h2>
-                        <p class="error-message">${err.message}</p>
-                        <div class="warning-box">
-                            <p class="warning-title">Note on running this file:</p>
-                            <p class="warning-text">
-                                Due to browser security restrictions (CORS), you cannot open this file directly with <code>file://</code>.
-                                <br>You must serve it using a local web server.
-                            </p>
-                            <p class="warning-command">
-                                python3 -m http.server 8000
-                            </p>
-                            <p class="warning-text">
-                                Then open <a href="http://localhost:8000" class="link-underline">http://localhost:8000</a>
-                            </p>
-                        </div>
-                    </div>
-                `;
+                console.error("Error loading app:", err);
+                document.getElementById('root').innerHTML = `<div style="color:red; padding:20px;">Error: ${err.message}</div>`;
             }
         }
 
-        run();
+        loadAndTransform();
     </script>
 </body>
 
