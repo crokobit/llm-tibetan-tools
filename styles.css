@@ -159,7 +159,7 @@ body {
     align-items: center;
     margin-left: 0.25rem;
     margin-right: 0.25rem;
-    vertical-align: top;
+    vertical-align: baseline;
     cursor: pointer;
     transition: all 200ms;
     position: relative;
@@ -173,7 +173,6 @@ body {
     background-color: #bfdbfe;
     /* bg-blue-200 */
     border-radius: 0.25rem;
-    padding: 0.5rem;
     transform: none;
 }
 
@@ -183,7 +182,7 @@ body {
     /* gap-x-0.5 */
     margin-left: 0.25rem;
     margin-right: 0.25rem;
-    vertical-align: top;
+    vertical-align: baseline;
     cursor: pointer;
     border-radius: 0.25rem;
     transition: background-color 200ms;
@@ -200,6 +199,7 @@ body {
     padding-right: 0.25rem;
     border-radius: 0.25rem 0.25rem 0 0;
     transition: background-color 200ms;
+    white-space: nowrap;
 }
 
 .word-card:hover .tibetan-word-box.allow-hover {

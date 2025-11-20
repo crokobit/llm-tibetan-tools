@@ -376,7 +376,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
 
         {/* --- Row 2: Main Analysis (Spans all cols) --- */}
         <div
-          style={{ gridColumn: `1 / span ${subUnits.length}` }}
+          style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
           className="main-analysis-box"
           onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
         >
