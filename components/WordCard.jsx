@@ -4,9 +4,12 @@ import { truncateDefinition } from '../utils/helpers.js';
 import renderHighlightedText from '../utils/renderHighlightedText.jsx';
 import AnalysisLabel from './AnalysisLabel.jsx';
 
+import { useSelection } from '../contexts/SelectionContext.jsx';
+
 const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive }) => {
     const { analysis, original, nestedData, supplementaryData } = unit;
     const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
+    const { getHighlightRange } = useSelection();
 
     const mainPosKey = analysis.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
     const mainBorderColor = POS_COLORS[mainPosKey] || POS_COLORS.other;
@@ -45,7 +48,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
     let currentGlobalOffset = 0; // Track offset for highlighting
 
     return (
-        <div
+        <span
             data-indices={indices ? JSON.stringify(indices) : undefined}
             className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''}`}
             style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
@@ -62,9 +65,33 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 // Check if this specific sub-word is being edited
                 const isThisSubWordEditing = isEditingExisting && editingTarget.indices.subIndex === i;
 
+                // Check for partial selection
+                const selectionRange = getHighlightRange(indices, i, u.original.length);
+                const isSelected = !!selectionRange;
+
+                let content = u.original;
+                if (isCreatingSub && editingTarget && editingTarget.creationDetails) {
+                    content = renderHighlightedText(
+                        u.original,
+                        editingTarget.creationDetails.startOffset,
+                        editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+                        myOffset,
+                        highlightColor
+                    );
+                } else if (isSelected) {
+                    content = renderHighlightedText(
+                        u.original,
+                        selectionRange[0],
+                        selectionRange[1],
+                        0,
+                        'custom-selected'
+                    );
+                }
+
                 return (
-                    <div
+                    <span
                         key={`tib-${i}`}
+                        data-subindex={i}
                         className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
                         onClick={(e) => {
                             // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
@@ -79,44 +106,36 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                         }}
                     >
                         <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
-                            {isCreatingSub && editingTarget && editingTarget.creationDetails
-                                ? renderHighlightedText(
-                                    u.original,
-                                    editingTarget.creationDetails.startOffset,
-                                    editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-                                    myOffset,
-                                    highlightColor
-                                )
-                                : u.original}
+                            {content}
                         </span>
-                    </div>
+                    </span>
                 );
             })}
 
             {/* --- Row 2: Main Analysis (Spans all cols) --- */}
-            <div
+            <span
                 style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
                 className="main-analysis-box"
                 onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
             >
                 {/* Main Analysis Underline */}
-                <div className={`main-analysis-underline ${mainBorderColor}`}></div>
+                <span className={`main-analysis-underline block ${mainBorderColor}`}></span>
 
                 {/* Main Analysis Text */}
-                <div className="flex flex-col items-center">
+                <span className="flex flex-col items-center">
                     <AnalysisLabel text={analysis.root} isSub={isNested} />
                     {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
-                    <div className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
+                    <span className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
                         {displayDef}
-                    </div>
-                </div>
-            </div>
+                    </span>
+                </span>
+            </span>
 
             {/* --- Row 3: Sub Analysis (Aligned cols) --- */}
             {hasSubAnalysis && subUnits.map((u, i) => {
                 // If tsheg, return empty cell to maintain grid structure but show nothing
                 if (u.original.trim() === '་') {
-                    return <div key={`sub-${i}`} />;
+                    return <span key={`sub-${i}`} />;
                 }
 
                 const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
@@ -131,7 +150,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                     editingTarget.indices.subIndex === i;
 
                 return (
-                    <div
+                    <span
                         key={`sub-${i}`}
                         className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
                         onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
@@ -140,20 +159,20 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                     >
                         {/* Sub Analysis Underline (Colored Bar) */}
                         {u.analysis && (
-                            <div className={`sub-analysis-underline ${subBgColor}`}></div>
+                            <span className={`sub-analysis-underline block ${subBgColor}`}></span>
                         )}
 
                         {/* Sub Analysis Text */}
-                        <div className="text-center w-full rounded">
-                            <div className="analysis-label-sub text-gray-600 font-medium">{u.analysis?.root}</div>
-                            <div className="analysis-def-sub text-gray-500 truncate w-full leading-tight">
+                        <span className="text-center w-full rounded block">
+                            <span className="analysis-label-sub text-gray-600 font-medium block">{u.analysis?.root}</span>
+                            <span className="analysis-def-sub text-gray-500 truncate w-full leading-tight block">
                                 {subDef}
-                            </div>
-                        </div>
-                    </div>
+                            </span>
+                        </span>
+                    </span>
                 );
             })}
-        </div>
+        </span>
     );
 };
 

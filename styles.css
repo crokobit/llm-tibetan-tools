@@ -811,19 +811,27 @@ body {
 }
 
 /* Selection Highlights */
-.tibetan-content.creating-mode ::selection {
+/* Selection Highlights */
+.tibetan-content {
+    /* Allow native selection for partial text selection */
+    user-select: text;
+}
+
+.custom-selected {
     background-color: #bbf7d0;
-    /* green-200 */
+    /* light green */
+}
+
+.tibetan-content.creating-mode ::selection {
+    background-color: transparent;
 }
 
 .tibetan-content.editing-mode ::selection {
-    background-color: #bfdbfe;
-    /* blue-200 */
+    background-color: transparent;
 }
 
 .tibetan-content ::selection {
-    background-color: #bfdbfe;
-    /* Default to blue */
+    background-color: transparent;
 }
 
 .block {

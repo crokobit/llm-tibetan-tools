@@ -3,7 +3,11 @@ import WordCard from './WordCard.jsx';
 import renderHighlightedText from '../utils/renderHighlightedText.jsx';
 import { FONT_SIZES } from '../utils/constants.js';
 
+import { useSelection } from '../contexts/SelectionContext.jsx';
+
 const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEditActive }) => {
+    const { getHighlightRange } = useSelection();
+
     if (unit.type === 'text') {
         // Check if this text unit should have highlighting for new analysis creation
         const isEditingTarget = editingTarget &&
@@ -14,6 +18,33 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
         const shouldHighlight = isEditingTarget && editingTarget.isCreating && editingTarget.creationDetails;
         const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'highlight-creating';
 
+        // Check for partial selection
+        const selectionRange = getHighlightRange(indices, null, unit.original.length);
+        const isSelected = !!selectionRange;
+
+        // Determine what to render
+        // Priority: Editing Highlight > Selection Highlight
+
+        let content = unit.original;
+
+        if (shouldHighlight) {
+            content = renderHighlightedText(
+                unit.original,
+                editingTarget.creationDetails.startOffset,
+                editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+                0,
+                highlightColor
+            );
+        } else if (isSelected) {
+            content = renderHighlightedText(
+                unit.original,
+                selectionRange[0],
+                selectionRange[1],
+                0,
+                'custom-selected' // We need to ensure this class works with renderHighlightedText logic or add it to styles
+            );
+        }
+
         return (
             <span
                 className={`inline-block mx-0.5 tibetan-word-box cursor-text`}
@@ -21,15 +52,7 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
                 onClick={(e) => e.stopPropagation()}
             >
                 <span className={`tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan}`}>
-                    {shouldHighlight
-                        ? renderHighlightedText(
-                            unit.original,
-                            editingTarget.creationDetails.startOffset,
-                            editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-                            0,
-                            highlightColor
-                        )
-                        : unit.original}
+                    {content}
                 </span>
             </span>
         );

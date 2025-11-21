@@ -1,124 +1,148 @@
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useDocument } from './DocumentContext.jsx';
-import { useEdit } from './EditContext.jsx';
 
 const SelectionContext = createContext();
 
-/**
- * Provider for text selection functionality.
- * Handles text selection for creating new analysis.
- */
 export function SelectionProvider({ children }) {
     const { documentData } = useDocument();
-    const { setEditingTarget, setAnchorRect } = useEdit();
+    const [selectionRange, setSelectionRange] = useState(null);
 
-    // Handle text selection for creating new analysis
-    const handleSelection = useCallback(() => {
+    // Helper to parse a DOM node to find indices
+    const getIndicesFromNode = (node) => {
+        if (!node) return null;
+
+        // Find the unit container
+        const unitNode = node.nodeType === 3 ? node.parentElement.closest('[data-indices]') : node.closest('[data-indices]');
+        if (!unitNode) return null;
+
+        const indices = JSON.parse(unitNode.dataset.indices);
+
+        // Check for sub-index
+        const subNode = node.nodeType === 3 ? node.parentElement.closest('[data-subindex]') : node.closest('[data-subindex]');
+        if (subNode) {
+            indices.subIndex = parseInt(subNode.dataset.subindex, 10);
+        }
+
+        return indices;
+    };
+
+    // Handle selection change
+    const handleSelectionChange = useCallback(() => {
         const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+            setSelectionRange(null);
+            return;
+        }
 
         const range = selection.getRangeAt(0);
-        const text = selection.toString();
+        const startIndices = getIndicesFromNode(range.startContainer);
+        const endIndices = getIndicesFromNode(range.endContainer);
 
-        // Find the closest unit container
-        const startNode = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
-        const endNode = range.endContainer.nodeType === 3 ? range.endContainer.parentElement : range.endContainer;
-
-        // IMPORTANT: Don't process if we're inside the edit popover
-        if (startNode.closest('.popover-container') || endNode.closest('.popover-container')) {
+        if (!startIndices || !endIndices) {
+            setSelectionRange(null);
             return;
         }
 
-        // Check if we are inside a tibetan text area
-        const startUnit = startNode.closest('[data-indices]');
-        const endUnit = endNode.closest('[data-indices]');
+        // Normalize start and end
+        let start = { ...startIndices, offset: range.startOffset };
+        let end = { ...endIndices, offset: range.endOffset };
 
-        if (!startUnit || !endUnit) return;
-
-        // Parse indices
-        const startIndices = JSON.parse(startUnit.dataset.indices);
-        const endIndices = JSON.parse(endUnit.dataset.indices);
-
-        // We only support selection within a single unit for now
-        if (startIndices.blockIdx !== endIndices.blockIdx ||
-            startIndices.lineIdx !== endIndices.lineIdx ||
-            startIndices.unitIdx !== endIndices.unitIdx) {
-            return;
-        }
-
-        const { blockIdx, lineIdx, unitIdx } = startIndices;
-        const unit = documentData[blockIdx].lines[lineIdx].units[unitIdx];
-
-        // Check if we are selecting inside a WordCard (adding sub-analysis)
-        const isWordCard = startUnit.classList.contains('word-card-grid') || startUnit.closest('.word-card-grid');
-
-        // Get the rect for the popover
-        const rect = range.getBoundingClientRect();
-        setAnchorRect(rect);
-
-        if (isWordCard) {
-            // Adding sub-analysis to an existing word
-            // Check if exact match exists
-            if (unit.nestedData) {
-                const existingSubIndex = unit.nestedData.findIndex(sub => sub.original === text.trim());
-                if (existingSubIndex !== -1) {
-                    // Found exact match! Switch to Edit Mode for that sub-unit.
-                    setEditingTarget({
-                        indices: { blockIdx, lineIdx, unitIdx, subIndex: existingSubIndex },
-                        isCreating: false,
-                        unit: unit.nestedData[existingSubIndex],
-                        highlightColor: 'highlight-editing' // Use blue for editing
-                    });
-                    return;
-                }
-            }
-
-            // Creating new sub-analysis
-            const startOffset = unit.original.indexOf(text);
-            const target = {
-                indices: { blockIdx, lineIdx, unitIdx },
-                isCreating: true,
-                creationDetails: {
-                    selectedText: text,
-                    startOffset: startOffset,
-                    fullOriginal: unit.original
-                },
-                possibleParents: [{ id: 'sub', label: 'Sub Analysis' }],
-                highlightColor: 'highlight-creating' // Use green for creating
-            };
-
-            setEditingTarget(target);
-
-        } else {
-            // Selecting in a plain text unit -> Creating Main Analysis
-            const target = {
-                indices: { blockIdx, lineIdx, unitIdx },
-                isCreating: true,
-                creationDetails: {
-                    selectedText: text,
-                    startOffset: unit.original.indexOf(text),
-                    fullOriginal: unit.original
-                },
-                possibleParents: [{ id: 'main', label: 'Main Analysis' }],
-                highlightColor: 'highlight-creating'
-            };
-
-            setEditingTarget(target);
-        }
-    }, [documentData, setEditingTarget, setAnchorRect]);
-
-    // Set up event listener for text selection
-    useEffect(() => {
-        const handleMouseUp = () => {
-            handleSelection();
+        // Compare to ensure start comes before end
+        const compare = (a, b) => {
+            if (a.blockIdx !== b.blockIdx) return a.blockIdx - b.blockIdx;
+            if (a.lineIdx !== b.lineIdx) return a.lineIdx - b.lineIdx;
+            if (a.unitIdx !== b.unitIdx) return a.unitIdx - b.unitIdx;
+            const subA = a.subIndex ?? -1;
+            const subB = b.subIndex ?? -1;
+            if (subA !== subB) return subA - subB;
+            return a.offset - b.offset;
         };
 
-        document.addEventListener('mouseup', handleMouseUp);
-        return () => document.removeEventListener('mouseup', handleMouseUp);
-    }, [handleSelection]);
+        if (compare(start, end) > 0) {
+            [start, end] = [end, start];
+        }
+
+        setSelectionRange({ start, end });
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('selectionchange', handleSelectionChange);
+        return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    }, [handleSelectionChange]);
+
+    // Helper to determine if a unit/sub-unit is selected and get the highlight range
+    const getHighlightRange = useCallback((indices, subIndex = null, textLength) => {
+        if (!selectionRange) return null;
+
+        const { start, end } = selectionRange;
+
+        // Construct current position object for comparison
+        // We compare "start of this unit" and "end of this unit" against selection range
+
+        const currentStart = { ...indices, subIndex, offset: 0 };
+        const currentEnd = { ...indices, subIndex, offset: textLength };
+
+        // Comparison helper
+        const comparePos = (a, b) => {
+            if (a.blockIdx !== b.blockIdx) return a.blockIdx - b.blockIdx;
+            if (a.lineIdx !== b.lineIdx) return a.lineIdx - b.lineIdx;
+            if (a.unitIdx !== b.unitIdx) return a.unitIdx - b.unitIdx;
+
+            // Treat undefined subIndex as -1 (main unit context)
+            // But here we are comparing specific positions.
+            // If subIndex is null, it means we are in a simple text unit.
+            // If subIndex is present, we are in a sub-unit.
+
+            const subA = a.subIndex ?? -1;
+            const subB = b.subIndex ?? -1;
+
+            if (subA !== subB) return subA - subB;
+            return a.offset - b.offset;
+        };
+
+        // Check intersection
+        // Selection is [start, end]
+        // Unit is [currentStart, currentEnd]
+
+        // If selection ends before unit starts: selectionEnd < unitStart -> No overlap
+        if (comparePos(end, currentStart) <= 0) return null;
+
+        // If selection starts after unit ends: selectionStart > unitEnd -> No overlap
+        if (comparePos(start, currentEnd) >= 0) return null;
+
+        // Calculate overlap
+        let startOffset = 0;
+        let endOffset = textLength;
+
+        // If selection starts inside this unit
+        if (comparePos(start, currentStart) > 0) {
+            startOffset = start.offset;
+        }
+
+        // If selection ends inside this unit
+        if (comparePos(end, currentEnd) < 0) {
+            endOffset = end.offset;
+        }
+
+        return [startOffset, endOffset];
+
+    }, [selectionRange]);
+
+    // Clear selection on Escape
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                window.getSelection()?.removeAllRanges();
+                setSelectionRange(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const value = {
-        handleSelection
+        selectionRange,
+        getHighlightRange
     };
 
     return (
@@ -128,10 +152,6 @@ export function SelectionProvider({ children }) {
     );
 }
 
-/**
- * Custom hook to access selection context.
- * @returns {Object} Selection context value
- */
 export function useSelection() {
     const context = useContext(SelectionContext);
     if (!context) {

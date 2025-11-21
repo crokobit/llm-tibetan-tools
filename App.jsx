@@ -106,7 +106,7 @@ function TibetanReaderContent() {
 
                 {/* Content Area */}
                 {/* Content Area */}
-                <div className="content-area" ref={contentRef}>
+                <div className="content-area tibetan-content" ref={contentRef}>
                     {loading ? (
                         <div className="loading-container">
                             <div className="loading-spinner"></div>
