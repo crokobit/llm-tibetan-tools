@@ -15,7 +15,6 @@ const POS_TYPES = [
 const OPERATORS = [
     { id: 'single', symbol: '•' },
     { id: 'transform', symbol: '→' },
-    { id: 'union', symbol: '|' },
 ];
 
 // Tense options - English abbreviations only
@@ -103,13 +102,45 @@ const EditPopover = () => {
         // Handle multi-select POS (e.g., "imp|past")
         if (nodeStr.includes('|')) {
             const parts = nodeStr.split('|').map(p => p.trim());
-            // Check if all parts are simple POS types (no parentheses)
-            const allSimple = parts.every(p => !p.includes('('));
+            // Check if all parts are simple POS types (no commas for attributes)
+            const allSimple = parts.every(p => !p.includes(','));
             if (allSimple) {
                 return { ids: parts, attrs: { hon: false, tense: [] } };
             }
         }
 
+        // New format: pos,attr1,attr2 (e.g., v,hon,past or adj,past|future)
+        if (nodeStr.includes(',')) {
+            const parts = nodeStr.split(',').map(p => p.trim());
+            const id = parts[0];
+            const attrs = { hon: false, tense: [] };
+
+            parts.slice(1).forEach(part => {
+                if (part === 'hon') {
+                    attrs.hon = true;
+                } else if (['past', 'imp', 'future', 'fut'].includes(part)) {
+                    const tenseValue = part === 'fut' ? 'future' : part;
+                    if (!attrs.tense.includes(tenseValue)) {
+                        attrs.tense.push(tenseValue);
+                    }
+                } else if (part.includes('|')) {
+                    // Handle tense multi-select like "past|future"
+                    const tenses = part.split('|').map(t => t.trim());
+                    tenses.forEach(t => {
+                        if (['past', 'imp', 'future', 'fut'].includes(t)) {
+                            const tenseValue = t === 'fut' ? 'future' : t;
+                            if (!attrs.tense.includes(tenseValue)) {
+                                attrs.tense.push(tenseValue);
+                            }
+                        }
+                    });
+                }
+            });
+
+            return { ids: [id], attrs };
+        }
+
+        // Old format with parentheses: pos(attr1, attr2) - for backward compatibility
         const match = nodeStr.match(/^([a-z]+)(?:\((.*?)\))?$/);
         if (!match) return { ids: [nodeStr], attrs: { hon: false, tense: [] } };
 
@@ -235,13 +266,14 @@ const EditPopover = () => {
         // For single POS, add attributes if any
         const nodeId = nodeIds[0];
         let parts = [];
-        if (attrs.tense && attrs.tense.length > 0) {
-            parts.push(...attrs.tense.map(t => t === 'future' ? 'fut' : t));
-        }
         if (attrs.hon) parts.push('hon');
+        if (attrs.tense && attrs.tense.length > 0) {
+            // Join multiple tenses with | instead of ,
+            parts.push(attrs.tense.join('|'));
+        }
 
         if (parts.length === 0) return nodeId;
-        return `${nodeId}(${parts.join(', ')})`;
+        return `${nodeId},${parts.join(',')}`;
     };
 
     // Get preview text
@@ -251,7 +283,7 @@ const EditPopover = () => {
 
         if (operator === 'single') return startText;
 
-        const opSymbol = operator === 'transform' ? ' → ' : ' | ';
+        const opSymbol = operator === 'transform' ? '→' : '|';
         const endText = (endNode && endNode.length > 0) ? formatNodeText(endNode, endAttrs) : '?';
 
         return `${startText}${opSymbol}${endText}`;
@@ -401,7 +433,6 @@ const EditPopover = () => {
                                     type={t}
                                     selected={endNode.includes(t.id)}
                                     onClick={handleEndNodeChange}
-                                    disabled={startNode.includes(t.id) && operator === 'transform'}
                                 />
                             ))}
                         </div>
