@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useEdit } from '../contexts/index.jsx';
 import PosSelect from './PosSelect.jsx';
 
-const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anchorRect, possibleParents }) => {
+const EditPopover = () => {
+    const { editingTarget, anchorRect, handleSaveEdit, handleDeleteAnalysis, handleCloseEdit } = useEdit();
+
+    const isOpen = !!editingTarget;
+    const data = editingTarget ? editingTarget.unit : null;
+    const isCreating = editingTarget ? editingTarget.isCreating : false;
+    const possibleParents = editingTarget ? editingTarget.possibleParents : [];
+
     const [formData, setFormData] = useState({
         volls: '', root: '', pos: '', tense: [], definition: ''
     });
@@ -69,18 +77,29 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
 
     useEffect(() => {
         const handleClickOutside = (event) => {
+            // Don't close if clicking inside the popover
             if (popoverRef.current && !popoverRef.current.contains(event.target)) {
-                onClose();
+                handleCloseEdit();
             }
         };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen, onClose]);
+
+        if (isOpen) {
+            // Use a slight delay to ensure the popover is fully rendered before adding listener
+            const timeoutId = setTimeout(() => {
+                document.addEventListener('mousedown', handleClickOutside);
+            }, 0);
+
+            return () => {
+                clearTimeout(timeoutId);
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }
+    }, [isOpen, handleCloseEdit]);
 
     if (!isOpen) return null;
 
     const handleSave = () => {
-        onSave({
+        handleSaveEdit({
             ...formData,
             tense: formData.tense.join('|')
         }, parentMode);
@@ -180,7 +199,7 @@ const EditPopover = ({ isOpen, onClose, onSave, onDelete, data, isCreating, anch
             {/* Footer */}
             <div className="popover-footer">
                 {!isCreating ? (
-                    <button onClick={onDelete} className="btn-delete">Delete</button>
+                    <button onClick={handleDeleteAnalysis} className="btn-delete">Delete</button>
                 ) : <span></span>}
                 <button onClick={handleSave} className="btn-save">Save</button>
             </div>
