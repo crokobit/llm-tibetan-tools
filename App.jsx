@@ -95,52 +95,51 @@ function TibetanReaderContent() {
                 </div>
 
                 {/* Content Area */}
-                {/* Content Area with Debug Sidebar */}
-                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                    <div className="content-area" ref={contentRef} style={{ flex: 1, minWidth: 0 }}>
-                        {loading ? (
-                            <div className="loading-container">
-                                <div className="loading-spinner"></div>
-                            </div>
-                        ) : (
-                            documentData.map((block, blockIdx) => (
-                                <div key={blockIdx} className="block-layout">
-                                    {block.lines.map((line, lineIdx) => (
-                                        <LineRenderer
-                                            key={lineIdx}
-                                            line={line}
-                                            blockIdx={blockIdx}
-                                            lineIdx={lineIdx}
-                                            editingTarget={editingTarget}
-                                            isAnyEditActive={!!editingTarget}
-                                        />
-                                    ))}
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Debug Panel */}
-                    {showDebug && (
-                        <div style={{ width: '350px', flexShrink: 0, padding: '1rem', borderLeft: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-                            <div className="debug-container" style={{ marginTop: 0 }}>
-                                <div className="debug-header">
-                                    <span>Current Text</span>
-                                    <button
-                                        className="btn-copy"
-                                        onClick={() => navigator.clipboard.writeText(debugText)}
-                                        title="Copy to clipboard"
-                                    >
-                                        Copy
-                                    </button>
-                                </div>
-                                <textarea
-                                    className="debug-textarea"
-                                    value={debugText}
-                                    readOnly
-                                />
-                            </div>
+                {/* Content Area */}
+                <div className="content-area" ref={contentRef}>
+                    {loading ? (
+                        <div className="loading-container">
+                            <div className="loading-spinner"></div>
                         </div>
+                    ) : (
+                        documentData.map((block, blockIdx) => (
+                            <div key={blockIdx} className="block-layout">
+                                {block.lines.map((line, lineIdx) => (
+                                    <LineRenderer
+                                        key={lineIdx}
+                                        line={line}
+                                        blockIdx={blockIdx}
+                                        lineIdx={lineIdx}
+                                        editingTarget={editingTarget}
+                                        isAnyEditActive={!!editingTarget}
+                                    />
+                                ))}
+                                {showDebug && (
+                                    <div className="block-debug-output" style={{
+                                        marginTop: '1rem',
+                                        padding: '1rem',
+                                        backgroundColor: '#f9fafb',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '0.375rem',
+                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                        whiteSpace: 'pre-wrap',
+                                        fontSize: '0.875rem',
+                                        color: '#374151'
+                                    }}>
+                                        {(() => {
+                                            let output = '>>>\n';
+                                            let rawText = '';
+                                            block.lines.forEach(line => {
+                                                line.units.forEach(u => rawText += u.original);
+                                            });
+                                            output += rawText + '\n';
+                                            output += AnalysisParser.format(block.lines);
+                                            return output;
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        ))
                     )}
                 </div>
             </div>
