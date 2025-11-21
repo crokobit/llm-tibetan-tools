@@ -294,6 +294,16 @@ body {
     border-color: #6b7280;
 }
 
+/* vn - Orange */
+.pos-border-vd {
+    border-color: #f97316;
+}
+
+/* vnd - Pink */
+.pos-border-vnd {
+    border-color: #ec4899;
+}
+
 /* gray-500 */
 
 /* POS Colors - Backgrounds */
@@ -315,6 +325,16 @@ body {
 
 .pos-bg-other {
     background-color: #6b7280;
+}
+
+/* vn - Orange */
+.pos-bg-vn {
+    background-color: #f97316;
+}
+
+/* vnd - Pink */
+.pos-bg-vnd {
+    background-color: #ec4899;
 }
 
 /* Highlights */

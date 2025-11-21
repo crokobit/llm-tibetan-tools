@@ -11,6 +11,8 @@ const PosSelect = ({ value, onChange }) => {
         { value: 'v', label: 'Verb (v)', color: POS_COLORS.v },
         { value: 'adj', label: 'Adjective (adj)', color: POS_COLORS.adj },
         { value: 'adv', label: 'Adverb (adv)', color: POS_COLORS.adv },
+        { value: 'vd', label: 'Vd', color: POS_COLORS.vd },
+        { value: 'vnd', label: 'vnd', color: POS_COLORS.vnd },
         { value: 'part', label: 'Particle', color: POS_COLORS.other },
     ];
 

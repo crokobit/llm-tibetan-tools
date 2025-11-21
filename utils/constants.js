@@ -9,5 +9,7 @@ export const POS_COLORS = {
     v: 'pos-border-v',
     adj: 'pos-border-adj',
     adv: 'pos-border-adv',
+    vd: 'pos-border-vd',
+    vnd: 'pos-border-vnd',
     other: 'pos-border-other'
 };
