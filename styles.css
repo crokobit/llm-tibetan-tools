@@ -211,6 +211,7 @@ body {
     margin-top: 0;
     /* Removed max-width constraint */
     min-width: 60px;
+    user-select: none;
 }
 
 .main-analysis-underline {
@@ -240,6 +241,7 @@ body {
     width: 100%;
     border-radius: 0.25rem;
     transition: background-color 200ms;
+    user-select: none;
 }
 
 .sub-analysis-cell.analyzed {
@@ -266,6 +268,10 @@ body {
 
 .sub-analysis-cell:hover .sub-analysis-underline {
     opacity: 1;
+}
+
+.tibetan-text-unit {
+    line-height: 1.2;
 }
 
 /* POS Colors - Borders */
