@@ -125,7 +125,7 @@ function TibetanReaderContent() {
                         <div style={{ width: '350px', flexShrink: 0, padding: '1rem', borderLeft: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
                             <div className="debug-container" style={{ marginTop: 0 }}>
                                 <div className="debug-header">
-                                    <span>Raw Text</span>
+                                    <span>Current Text</span>
                                     <button
                                         className="btn-copy"
                                         onClick={() => navigator.clipboard.writeText(debugText)}
