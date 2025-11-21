@@ -910,6 +910,15 @@ body {
     margin-bottom: 0.75rem;
 }
 
+.mx-0\.5 {
+    margin-left: 0.125rem;
+    margin-right: 0.125rem;
+}
+
+.inline-block {
+    display: inline-block;
+}
+
 /* Error Handling */
 .error-container {
     padding: 2rem;

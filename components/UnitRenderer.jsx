@@ -16,19 +16,21 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
 
         return (
             <span
-                className={`inline-block mx-0.5 tibetan-font tibetan-text-unit ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan} cursor-text`}
+                className={`inline-block mx-0.5 tibetan-word-box cursor-text`}
                 data-indices={indices ? JSON.stringify(indices) : undefined}
                 onClick={(e) => e.stopPropagation()}
             >
-                {shouldHighlight
-                    ? renderHighlightedText(
-                        unit.original,
-                        editingTarget.creationDetails.startOffset,
-                        editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-                        0,
-                        highlightColor
-                    )
-                    : unit.original}
+                <span className={`tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan}`}>
+                    {shouldHighlight
+                        ? renderHighlightedText(
+                            unit.original,
+                            editingTarget.creationDetails.startOffset,
+                            editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
+                            0,
+                            highlightColor
+                        )
+                        : unit.original}
+                </span>
             </span>
         );
     }
