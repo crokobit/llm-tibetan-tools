@@ -5,6 +5,8 @@ import { useEdit } from '../contexts/index.jsx';
 const POS_TYPES = [
     { id: 'n', label: 'n', features: ['hon'] },
     { id: 'v', label: 'v', features: ['hon', 'tense'] },
+    { id: 'vd', label: 'vd', features: [] },
+    { id: 'vnd', label: 'vnd', features: [] },
     { id: 'adj', label: 'adj', features: [] },
     { id: 'adv', label: 'adv', features: [] },
     { id: 'part', label: 'part', features: [] },
