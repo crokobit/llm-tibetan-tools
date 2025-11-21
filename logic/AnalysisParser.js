@@ -53,4 +53,33 @@ export default class AnalysisParser {
 
         return internalString.replace(/\s+/g, ' ').trim();
     }
+
+    static format(lines) {
+        let output = '';
+        lines.forEach(line => {
+            line.units.forEach(unit => {
+                if (unit.type === 'word') {
+                    output += this._formatNode(unit, 0);
+                }
+            });
+        });
+        return output;
+    }
+
+    static _formatNode(node, depth) {
+        let output = '';
+        const indent = '\t'.repeat(depth);
+        const analysisString = this.serialize(node.analysis, node.original);
+
+        output += `${indent}${node.original} ${analysisString}\n`;
+
+        if (node.nestedData && node.nestedData.length > 0) {
+            node.nestedData.forEach(child => {
+                if (child.type === 'word') {
+                    output += this._formatNode(child, depth + 1);
+                }
+            });
+        }
+        return output;
+    }
 }

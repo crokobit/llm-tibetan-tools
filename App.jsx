@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { AppProviders, useDocument, useEdit } from './contexts/index.jsx';
 import AnalysisParser from './logic/AnalysisParser.js';
 import LineRenderer from './components/LineRenderer.jsx';
@@ -26,7 +26,7 @@ function TibetanReaderContent() {
 
 
     // Generate Output
-    const generateRawOutput = () => {
+    const debugText = useMemo(() => {
         let output = '';
         documentData.forEach(block => {
             output += '>>>\n';
@@ -40,11 +40,10 @@ function TibetanReaderContent() {
             output += AnalysisParser.format(block.lines) + '\n';
         });
         return output;
-    };
+    }, [documentData]);
 
     const downloadOutput = () => {
-        const text = generateRawOutput();
-        const blob = new Blob([text], { type: 'text/plain' });
+        const blob = new Blob([debugText], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -85,29 +84,63 @@ function TibetanReaderContent() {
                     >
                         Export Text
                     </button>
+                    <label className="debug-mode-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
+                        <input
+                            type="checkbox"
+                            checked={showDebug}
+                            onChange={(e) => setShowDebug(e.target.checked)}
+                        />
+                        Debug Mode
+                    </label>
                 </div>
 
                 {/* Content Area */}
-                <div className="content-area" ref={contentRef}>
-                    {loading ? (
-                        <div className="loading-container">
-                            <div className="loading-spinner"></div>
-                        </div>
-                    ) : (
-                        documentData.map((block, blockIdx) => (
-                            <div key={blockIdx} className="block-layout">
-                                {block.lines.map((line, lineIdx) => (
-                                    <LineRenderer
-                                        key={lineIdx}
-                                        line={line}
-                                        blockIdx={blockIdx}
-                                        lineIdx={lineIdx}
-                                        editingTarget={editingTarget}
-                                        isAnyEditActive={!!editingTarget}
-                                    />
-                                ))}
+                {/* Content Area with Debug Sidebar */}
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <div className="content-area" ref={contentRef} style={{ flex: 1, minWidth: 0 }}>
+                        {loading ? (
+                            <div className="loading-container">
+                                <div className="loading-spinner"></div>
                             </div>
-                        ))
+                        ) : (
+                            documentData.map((block, blockIdx) => (
+                                <div key={blockIdx} className="block-layout">
+                                    {block.lines.map((line, lineIdx) => (
+                                        <LineRenderer
+                                            key={lineIdx}
+                                            line={line}
+                                            blockIdx={blockIdx}
+                                            lineIdx={lineIdx}
+                                            editingTarget={editingTarget}
+                                            isAnyEditActive={!!editingTarget}
+                                        />
+                                    ))}
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Debug Panel */}
+                    {showDebug && (
+                        <div style={{ width: '350px', flexShrink: 0, padding: '1rem', borderLeft: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+                            <div className="debug-container" style={{ marginTop: 0 }}>
+                                <div className="debug-header">
+                                    <span>Raw Text</span>
+                                    <button
+                                        className="btn-copy"
+                                        onClick={() => navigator.clipboard.writeText(debugText)}
+                                        title="Copy to clipboard"
+                                    >
+                                        Copy
+                                    </button>
+                                </div>
+                                <textarea
+                                    className="debug-textarea"
+                                    value={debugText}
+                                    readOnly
+                                />
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
