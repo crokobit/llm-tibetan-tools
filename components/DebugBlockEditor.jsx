@@ -24,12 +24,6 @@ export default function DebugBlockEditor({ block, onUpdate }) {
     useEffect(() => {
         const currentSerial = JSON.stringify(block);
 
-        console.log('[DebugBlockEditor] Block changed:', {
-            serialChanged: currentSerial !== blockSerialRef.current,
-            isTyping: isTypingRef.current,
-            willUpdate: currentSerial !== blockSerialRef.current && !isTypingRef.current
-        });
-
         // Only update if block content actually changed AND we're not actively typing
         if (currentSerial !== blockSerialRef.current && !isTypingRef.current) {
             console.log('[DebugBlockEditor] Updating text from block change');

@@ -33,12 +33,12 @@ const EditPopover = () => {
     const isCreating = editingTarget ? editingTarget.isCreating : false;
     const possibleParents = editingTarget ? editingTarget.possibleParents : [];
 
-    // POS Builder state
-    const [startNode, setStartNode] = useState(null);
-    const [startAttrs, setStartAttrs] = useState({ hon: false, tense: null });
+    // POS Builder state - now supports multi-select
+    const [startNode, setStartNode] = useState([]);
+    const [startAttrs, setStartAttrs] = useState({ hon: false, tense: [] });
     const [operator, setOperator] = useState('single');
-    const [endNode, setEndNode] = useState(null);
-    const [endAttrs, setEndAttrs] = useState({ hon: false, tense: null });
+    const [endNode, setEndNode] = useState([]);
+    const [endAttrs, setEndAttrs] = useState({ hon: false, tense: [] });
 
     // Form data
     const [formData, setFormData] = useState({
@@ -51,68 +51,96 @@ const EditPopover = () => {
 
     // Parse existing POS string into builder state
     const parsePosString = (posStr) => {
-        if (!posStr) return { start: null, startAttrs: { hon: false, tense: null }, op: 'single', end: null, endAttrs: { hon: false, tense: null } };
+        if (!posStr) return { start: [], startAttrs: { hon: false, tense: [] }, op: 'single', end: [], endAttrs: { hon: false, tense: [] } };
 
         // Check for operators
         if (posStr.includes('->') || posStr.includes('→')) {
             const parts = posStr.split(/->|→/).map(p => p.trim());
             return {
-                start: parseNode(parts[0]).id,
+                start: parseNode(parts[0]).ids,
                 startAttrs: parseNode(parts[0]).attrs,
                 op: 'transform',
-                end: parseNode(parts[1]).id,
+                end: parseNode(parts[1]).ids,
                 endAttrs: parseNode(parts[1]).attrs
             };
         } else if (posStr.includes('|')) {
-            const parts = posStr.split('|').map(p => p.trim());
-            return {
-                start: parseNode(parts[0]).id,
-                startAttrs: parseNode(parts[0]).attrs,
-                op: 'union',
-                end: parseNode(parts[1]).id,
-                endAttrs: parseNode(parts[1]).attrs
-            };
+            // Check if it's a union operator or multi-select within a node
+            // First, try to parse as a single multi-select node
+            const node = parseNode(posStr);
+            if (node.ids.length > 1) {
+                // It's a multi-select node
+                return {
+                    start: node.ids,
+                    startAttrs: node.attrs,
+                    op: 'single',
+                    end: [],
+                    endAttrs: { hon: false, tense: [] }
+                };
+            } else {
+                // It's a union operator
+                const parts = posStr.split('|').map(p => p.trim());
+                return {
+                    start: parseNode(parts[0]).ids,
+                    startAttrs: parseNode(parts[0]).attrs,
+                    op: 'union',
+                    end: parseNode(parts[1]).ids,
+                    endAttrs: parseNode(parts[1]).attrs
+                };
+            }
         } else {
             const node = parseNode(posStr);
             return {
-                start: node.id,
+                start: node.ids,
                 startAttrs: node.attrs,
                 op: 'single',
-                end: null,
-                endAttrs: { hon: false, tense: null }
+                end: [],
+                endAttrs: { hon: false, tense: [] }
             };
         }
     };
 
     const parseNode = (nodeStr) => {
+        // Handle multi-select POS (e.g., "imp|past")
+        if (nodeStr.includes('|')) {
+            const parts = nodeStr.split('|').map(p => p.trim());
+            // Check if all parts are simple POS types (no parentheses)
+            const allSimple = parts.every(p => !p.includes('('));
+            if (allSimple) {
+                return { ids: parts, attrs: { hon: false, tense: [] } };
+            }
+        }
+
         const match = nodeStr.match(/^([a-z]+)(?:\((.*?)\))?$/);
-        if (!match) return { id: nodeStr, attrs: { hon: false, tense: null } };
+        if (!match) return { ids: [nodeStr], attrs: { hon: false, tense: [] } };
 
         const id = match[1];
         const attrsStr = match[2];
-        const attrs = { hon: false, tense: null };
+        const attrs = { hon: false, tense: [] };
 
         if (attrsStr) {
             const parts = attrsStr.split(',').map(p => p.trim());
             parts.forEach(part => {
                 if (part === 'hon') attrs.hon = true;
                 else if (['past', 'imp', 'future', 'fut'].includes(part)) {
-                    attrs.tense = part === 'fut' ? 'future' : part;
+                    const tenseValue = part === 'fut' ? 'future' : part;
+                    if (!attrs.tense.includes(tenseValue)) {
+                        attrs.tense.push(tenseValue);
+                    }
                 }
             });
         }
 
-        return { id, attrs };
+        return { ids: [id], attrs };
     };
 
     useEffect(() => {
         if (isCreating) {
             setFormData({ text: '', volls: '', root: '', definition: '' });
-            setStartNode(null);
-            setStartAttrs({ hon: false, tense: null });
+            setStartNode([]);
+            setStartAttrs({ hon: false, tense: [] });
             setOperator('single');
-            setEndNode(null);
-            setEndAttrs({ hon: false, tense: null });
+            setEndNode([]);
+            setEndAttrs({ hon: false, tense: [] });
 
             if (possibleParents && possibleParents.length > 0) {
                 const subOption = possibleParents.find(p => p.id === 'sub');
@@ -196,10 +224,20 @@ const EditPopover = () => {
     if (!isOpen) return null;
 
     // Format node text
-    const formatNodeText = (nodeId, attrs) => {
-        if (!nodeId) return '?';
+    const formatNodeText = (nodeIds, attrs) => {
+        if (!nodeIds || nodeIds.length === 0) return '?';
+
+        // For multi-select POS, just join with |
+        if (nodeIds.length > 1) {
+            return nodeIds.join('|');
+        }
+
+        // For single POS, add attributes if any
+        const nodeId = nodeIds[0];
         let parts = [];
-        if (attrs.tense) parts.push(attrs.tense === 'future' ? 'fut' : attrs.tense);
+        if (attrs.tense && attrs.tense.length > 0) {
+            parts.push(...attrs.tense.map(t => t === 'future' ? 'fut' : t));
+        }
         if (attrs.hon) parts.push('hon');
 
         if (parts.length === 0) return nodeId;
@@ -208,13 +246,13 @@ const EditPopover = () => {
 
     // Get preview text
     const getPreviewText = () => {
-        if (!startNode) return '...';
+        if (!startNode || startNode.length === 0) return '...';
         const startText = formatNodeText(startNode, startAttrs);
 
         if (operator === 'single') return startText;
 
         const opSymbol = operator === 'transform' ? ' → ' : ' | ';
-        const endText = endNode ? formatNodeText(endNode, endAttrs) : '?';
+        const endText = (endNode && endNode.length > 0) ? formatNodeText(endNode, endAttrs) : '?';
 
         return `${startText}${opSymbol}${endText}`;
     };
@@ -229,13 +267,23 @@ const EditPopover = () => {
     };
 
     const handleStartNodeChange = (posId) => {
-        setStartNode(posId);
-        setStartAttrs({ hon: false, tense: null });
+        // Toggle selection for multi-select
+        if (startNode.includes(posId)) {
+            setStartNode(startNode.filter(id => id !== posId));
+        } else {
+            setStartNode([...startNode, posId]);
+        }
+        setStartAttrs({ hon: false, tense: [] });
     };
 
     const handleEndNodeChange = (posId) => {
-        setEndNode(posId);
-        setEndAttrs({ hon: false, tense: null });
+        // Toggle selection for multi-select
+        if (endNode.includes(posId)) {
+            setEndNode(endNode.filter(id => id !== posId));
+        } else {
+            setEndNode([...endNode, posId]);
+        }
+        setEndAttrs({ hon: false, tense: [] });
     };
 
     // Attribute Selector Component
@@ -246,36 +294,42 @@ const EditPopover = () => {
         }
 
         const toggleHon = () => setAttrs({ ...attrs, hon: !attrs.hon });
-        const setTense = (tenseId) => setAttrs({ ...attrs, tense: attrs.tense === tenseId ? null : tenseId });
+        const toggleTense = (tenseId) => {
+            if (attrs.tense.includes(tenseId)) {
+                setAttrs({ ...attrs, tense: attrs.tense.filter(t => t !== tenseId) });
+            } else {
+                setAttrs({ ...attrs, tense: [...attrs.tense, tenseId] });
+            }
+        };
 
         return (
-          <div className="attr-selector">
-            {(posConfig.features.includes('tense') || posConfig.features.includes('hon')) && (
-              <div className="attr-row">
-                {posConfig.features.includes('hon') && (
-                  <button
-                    onClick={toggleHon}
-                    className={`hon-button ${attrs.hon ? 'active' : ''}`}
-                  >
-                    {'Hon'}
-                  </button>
+            <div className="attr-selector">
+                {(posConfig.features.includes('tense') || posConfig.features.includes('hon')) && (
+                    <div className="attr-row">
+                        {posConfig.features.includes('hon') && (
+                            <button
+                                onClick={toggleHon}
+                                className={`hon-button ${attrs.hon ? 'active' : ''}`}
+                            >
+                                {'Hon'}
+                            </button>
+                        )}
+                        {(posConfig.features.includes('tense') && (
+                            <div className="pos-options">
+                                {TENSE_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => toggleTense(opt.id)}
+                                        className={`pos-option ${attrs.tense.includes(opt.id) ? 'active' : ''}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
                 )}
-                {(posConfig.features.includes('tense') && (
-                  <div className="pos-options">
-                    {TENSE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setTense(opt.id)}
-                        className={`pos-option ${attrs.tense === opt.id ? 'active' : ''}`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            </div>
         );
     };
 
@@ -309,21 +363,21 @@ const EditPopover = () => {
                         <PosButton
                             key={t.id}
                             type={t}
-                            selected={startNode === t.id}
+                            selected={startNode.includes(t.id)}
                             onClick={handleStartNodeChange}
                         />
                     ))}
                 </div>
-                {startNode && (
+                {startNode.length === 1 && (
                     <AttributeSelector
-                        posId={startNode}
+                        posId={startNode[0]}
                         attrs={startAttrs}
                         setAttrs={setStartAttrs}
                     />
                 )}
 
                 {/* Operator Selection */}
-                <div className={`operator-section ${!startNode ? 'section-disabled' : ''}`}>
+                <div className={`operator-section ${startNode.length === 0 ? 'section-disabled' : ''}`}>
                     <div className="operator-grid">
                         {OPERATORS.map(op => (
                             <button
@@ -338,22 +392,22 @@ const EditPopover = () => {
                 </div>
 
                 {/* End Node Selection */}
-                {operator !== 'single' && startNode && (
+                {operator !== 'single' && startNode.length > 0 && (
                     <>
                         <div className="pos-button-grid">
                             {POS_TYPES.map(t => (
                                 <PosButton
                                     key={t.id}
                                     type={t}
-                                    selected={endNode === t.id}
+                                    selected={endNode.includes(t.id)}
                                     onClick={handleEndNodeChange}
-                                    disabled={t.id === startNode && operator === 'transform'}
+                                    disabled={startNode.includes(t.id) && operator === 'transform'}
                                 />
                             ))}
                         </div>
-                        {endNode && (
+                        {endNode.length === 1 && (
                             <AttributeSelector
-                                posId={endNode}
+                                posId={endNode[0]}
                                 attrs={endAttrs}
                                 setAttrs={setEndAttrs}
                             />
@@ -400,7 +454,7 @@ const EditPopover = () => {
                 <button
                     onClick={handleSave}
                     className="btn-save"
-                    disabled={!startNode || (operator !== 'single' && !endNode)}
+                    disabled={startNode.length === 0 || (operator !== 'single' && endNode.length === 0)}
                 >
                     Save
                 </button>
