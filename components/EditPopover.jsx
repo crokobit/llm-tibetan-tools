@@ -1,6 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useEdit } from '../contexts/index.jsx';
-import PosSelect from './PosSelect.jsx';
+
+// POS types with English abbreviations only
+const POS_TYPES = [
+    { id: 'n', label: 'n', features: ['hon'] },
+    { id: 'v', label: 'v', features: ['hon', 'tense'] },
+    { id: 'adj', label: 'adj', features: [] },
+    { id: 'adv', label: 'adv', features: [] },
+    { id: 'part', label: 'part', features: [] },
+    { id: 'other', label: 'other', features: [] },
+];
+
+// Operators with icons
+const OPERATORS = [
+    { id: 'single', symbol: '•' },
+    { id: 'transform', symbol: '→' },
+    { id: 'union', symbol: '|' },
+];
+
+// Tense options - English abbreviations only
+const TENSE_OPTIONS = [
+    { id: 'past', label: 'past' },
+    { id: 'imp', label: 'imp' },
+    { id: 'future', label: 'fut' },
+];
 
 const EditPopover = () => {
     const { editingTarget, anchorRect, handleSaveEdit, handleDeleteAnalysis, handleCloseEdit } = useEdit();
@@ -10,18 +33,87 @@ const EditPopover = () => {
     const isCreating = editingTarget ? editingTarget.isCreating : false;
     const possibleParents = editingTarget ? editingTarget.possibleParents : [];
 
+    // POS Builder state
+    const [startNode, setStartNode] = useState(null);
+    const [startAttrs, setStartAttrs] = useState({ hon: false, tense: null });
+    const [operator, setOperator] = useState('single');
+    const [endNode, setEndNode] = useState(null);
+    const [endAttrs, setEndAttrs] = useState({ hon: false, tense: null });
+
+    // Form data
     const [formData, setFormData] = useState({
-        text: '', volls: '', root: '', pos: '', tense: [], definition: ''
+        text: '', volls: '', root: '', definition: ''
     });
-    const [parentMode, setParentMode] = useState('main'); // 'main' or 'sub'
+    const [parentMode, setParentMode] = useState('main');
     const popoverRef = useRef(null);
     const [coords, setCoords] = useState({ top: 0, left: 0, opacity: 0 });
     const [placement, setPlacement] = useState('bottom');
 
+    // Parse existing POS string into builder state
+    const parsePosString = (posStr) => {
+        if (!posStr) return { start: null, startAttrs: { hon: false, tense: null }, op: 'single', end: null, endAttrs: { hon: false, tense: null } };
+
+        // Check for operators
+        if (posStr.includes('->') || posStr.includes('→')) {
+            const parts = posStr.split(/->|→/).map(p => p.trim());
+            return {
+                start: parseNode(parts[0]).id,
+                startAttrs: parseNode(parts[0]).attrs,
+                op: 'transform',
+                end: parseNode(parts[1]).id,
+                endAttrs: parseNode(parts[1]).attrs
+            };
+        } else if (posStr.includes('|')) {
+            const parts = posStr.split('|').map(p => p.trim());
+            return {
+                start: parseNode(parts[0]).id,
+                startAttrs: parseNode(parts[0]).attrs,
+                op: 'union',
+                end: parseNode(parts[1]).id,
+                endAttrs: parseNode(parts[1]).attrs
+            };
+        } else {
+            const node = parseNode(posStr);
+            return {
+                start: node.id,
+                startAttrs: node.attrs,
+                op: 'single',
+                end: null,
+                endAttrs: { hon: false, tense: null }
+            };
+        }
+    };
+
+    const parseNode = (nodeStr) => {
+        const match = nodeStr.match(/^([a-z]+)(?:\((.*?)\))?$/);
+        if (!match) return { id: nodeStr, attrs: { hon: false, tense: null } };
+
+        const id = match[1];
+        const attrsStr = match[2];
+        const attrs = { hon: false, tense: null };
+
+        if (attrsStr) {
+            const parts = attrsStr.split(',').map(p => p.trim());
+            parts.forEach(part => {
+                if (part === 'hon') attrs.hon = true;
+                else if (['past', 'imp', 'future', 'fut'].includes(part)) {
+                    attrs.tense = part === 'fut' ? 'future' : part;
+                }
+            });
+        }
+
+        return { id, attrs };
+    };
+
     useEffect(() => {
         if (isCreating) {
-            setFormData({ text: '', volls: '', root: '', pos: 'other', tense: [], definition: '' });
-            // Default to 'sub' if available as it's likely the intent when selecting inside a word
+            setFormData({ text: '', volls: '', root: '', definition: '' });
+            setStartNode(null);
+            setStartAttrs({ hon: false, tense: null });
+            setOperator('single');
+            setEndNode(null);
+            setEndAttrs({ hon: false, tense: null });
+
             if (possibleParents && possibleParents.length > 0) {
                 const subOption = possibleParents.find(p => p.id === 'sub');
                 if (subOption) setParentMode('sub');
@@ -34,10 +126,16 @@ const EditPopover = () => {
                 text: data.original || '',
                 volls: data.analysis.volls || '',
                 root: data.analysis.root || '',
-                pos: data.analysis.pos || '',
-                tense: data.analysis.tense ? data.analysis.tense.split('|') : [],
                 definition: data.analysis.definition || ''
             });
+
+            // Parse POS into builder state
+            const parsed = parsePosString(data.analysis.pos);
+            setStartNode(parsed.start);
+            setStartAttrs(parsed.startAttrs);
+            setOperator(parsed.op);
+            setEndNode(parsed.end);
+            setEndAttrs(parsed.endAttrs);
         }
     }, [data, isCreating, possibleParents]);
 
@@ -74,18 +172,16 @@ const EditPopover = () => {
 
         setCoords({ top, left, opacity: 1 });
         setPlacement(newPlacement);
-    }, [isOpen, anchorRect, formData.pos, formData.tense.length, parentMode]);
+    }, [isOpen, anchorRect, startNode, startAttrs, operator, endNode, endAttrs, parentMode]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            // Don't close if clicking inside the popover
             if (popoverRef.current && !popoverRef.current.contains(event.target)) {
                 handleCloseEdit();
             }
         };
 
         if (isOpen) {
-            // Use a slight delay to ensure the popover is fully rendered before adding listener
             const timeoutId = setTimeout(() => {
                 document.addEventListener('mousedown', handleClickOutside);
             }, 0);
@@ -99,23 +195,99 @@ const EditPopover = () => {
 
     if (!isOpen) return null;
 
+    // Format node text
+    const formatNodeText = (nodeId, attrs) => {
+        if (!nodeId) return '?';
+        let parts = [];
+        if (attrs.tense) parts.push(attrs.tense === 'future' ? 'fut' : attrs.tense);
+        if (attrs.hon) parts.push('hon');
+
+        if (parts.length === 0) return nodeId;
+        return `${nodeId}(${parts.join(', ')})`;
+    };
+
+    // Get preview text
+    const getPreviewText = () => {
+        if (!startNode) return '...';
+        const startText = formatNodeText(startNode, startAttrs);
+
+        if (operator === 'single') return startText;
+
+        const opSymbol = operator === 'transform' ? ' → ' : ' | ';
+        const endText = endNode ? formatNodeText(endNode, endAttrs) : '?';
+
+        return `${startText}${opSymbol}${endText}`;
+    };
+
     const handleSave = () => {
+        const posString = getPreviewText();
         handleSaveEdit({
             ...formData,
-            tense: formData.tense.join('|')
+            pos: posString,
+            tense: ''
         }, parentMode);
     };
 
-    const toggleTense = (val) => {
-        setFormData(prev => ({
-            ...prev,
-            tense: prev.tense.includes(val)
-                ? prev.tense.filter(t => t !== val)
-                : [...prev.tense, val]
-        }));
-    }
+    const handleStartNodeChange = (posId) => {
+        setStartNode(posId);
+        setStartAttrs({ hon: false, tense: null });
+    };
 
-    const isVerb = ['v', 'vd', 'vn'].some(t => formData.pos.includes(t));
+    const handleEndNodeChange = (posId) => {
+        setEndNode(posId);
+        setEndAttrs({ hon: false, tense: null });
+    };
+
+    // Attribute Selector Component
+    const AttributeSelector = ({ posId, attrs, setAttrs }) => {
+        const posConfig = POS_TYPES.find(p => p.id === posId);
+        if (!posConfig || (!posConfig.features.includes('hon') && !posConfig.features.includes('tense'))) {
+            return null;
+        }
+
+        const toggleHon = () => setAttrs({ ...attrs, hon: !attrs.hon });
+        const setTense = (tenseId) => setAttrs({ ...attrs, tense: attrs.tense === tenseId ? null : tenseId });
+
+        return (
+          <div className="attr-selector">
+            {(posConfig.features.includes('tense') || posConfig.features.includes('hon')) && (
+              <div className="attr-row">
+                {posConfig.features.includes('hon') && (
+                  <button
+                    onClick={toggleHon}
+                    className={`hon-button ${attrs.hon ? 'active' : ''}`}
+                  >
+                    {'Hon'}
+                  </button>
+                )}
+                {(posConfig.features.includes('tense') && (
+                  <div className="pos-options">
+                    {TENSE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setTense(opt.id)}
+                        className={`pos-option ${attrs.tense === opt.id ? 'active' : ''}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+    };
+
+    const PosButton = ({ type, selected, onClick, disabled }) => (
+        <button
+            onClick={() => !disabled && onClick(type.id)}
+            disabled={disabled}
+            className={`pos-button ${selected ? 'selected' : ''}`}
+        >
+            {type.label}
+        </button>
+    );
 
     return (
         <div
@@ -123,90 +295,101 @@ const EditPopover = () => {
             className="popover-container"
             style={{ top: coords.top, left: coords.left, opacity: coords.opacity }}
         >
-            {/* Arrow */}
-            <div
-                className={`popover-arrow ${placement === 'bottom' ? 'bottom' : 'top'}`}
-            ></div>
+            <div className={`popover-arrow ${placement === 'bottom' ? 'bottom' : 'top'}`}></div>
 
             <div className="popover-content">
-                {/* Parent Selection Dropdown - Hidden for now */}
-                {false && isCreating && possibleParents && possibleParents.length > 1 && (
-                    <div className="mb-2">
-                        <label className="block text-xs text-gray-500 mb-1">Add Analysis To:</label>
-                        <select
-                            value={parentMode}
-                            onChange={(e) => setParentMode(e.target.value)}
-                            className="w-full border rounded px-2 py-1 text-xs bg-blue-50 border-blue-200 text-blue-800 font-medium focus:outline-none focus:border-blue-400"
-                        >
-                            {possibleParents.map(p => (
-                                <option key={p.id} value={p.id}>{p.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {/* Row 1: Text (Word) - Read-only display */}
-                <div style={{
-                    padding: '0.5rem',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '0.375rem',
-                    fontWeight: '500',
-                    fontSize: '1rem',
-                    color: '#1f2937'
-                }}>
+                {/* Text Display */}
+                <div className="text-display">
                     {formData.text || '(no text)'}
                 </div>
 
-                {/* Row 2: Root & POS */}
-                <div className="flex gap-2">
-                    <div className="flex-1">
-                        <input
-                            className="form-input"
-                            value={formData.root}
-                            onChange={e => setFormData({ ...formData, root: e.target.value })}
-                            placeholder="Root"
+                {/* POS Selection */}
+                <div className="pos-button-grid">
+                    {POS_TYPES.map(t => (
+                        <PosButton
+                            key={t.id}
+                            type={t}
+                            selected={startNode === t.id}
+                            onClick={handleStartNodeChange}
                         />
-                    </div>
-                    <div className="w-24">
-                        <PosSelect value={formData.pos} onChange={(val) => setFormData({ ...formData, pos: val })} />
-                    </div>
+                    ))}
                 </div>
-
-                {/* Row 3: Volls (Optional) */}
-                <div>
-                    <input
-                        className="form-input text-xs"
-                        value={formData.volls}
-                        onChange={e => setFormData({ ...formData, volls: e.target.value })}
-                        placeholder="Full form (optional)"
+                {startNode && (
+                    <AttributeSelector
+                        posId={startNode}
+                        attrs={startAttrs}
+                        setAttrs={setStartAttrs}
                     />
-                </div>
+                )}
 
-                {/* Row 4: Tense (Conditional) */}
-                {isVerb && (
-                    <div className="flex flex-wrap gap-1">
-                        {['past', 'future', 'imperative'].map(t => (
+                {/* Operator Selection */}
+                <div className={`operator-section ${!startNode ? 'section-disabled' : ''}`}>
+                    <div className="operator-grid">
+                        {OPERATORS.map(op => (
                             <button
-                                key={t}
-                                onClick={() => toggleTense(t)}
-                                className={`tense-button ${formData.tense.includes(t) ? 'active' : 'inactive'}`}
+                                key={op.id}
+                                onClick={() => setOperator(op.id)}
+                                className={`operator-button ${operator === op.id ? 'selected' : ''}`}
                             >
-                                {t}
+                                {op.symbol}
                             </button>
                         ))}
                     </div>
+                </div>
+
+                {/* End Node Selection */}
+                {operator !== 'single' && startNode && (
+                    <>
+                        <div className="pos-button-grid">
+                            {POS_TYPES.map(t => (
+                                <PosButton
+                                    key={t.id}
+                                    type={t}
+                                    selected={endNode === t.id}
+                                    onClick={handleEndNodeChange}
+                                    disabled={t.id === startNode && operator === 'transform'}
+                                />
+                            ))}
+                        </div>
+                        {endNode && (
+                            <AttributeSelector
+                                posId={endNode}
+                                attrs={endAttrs}
+                                setAttrs={setEndAttrs}
+                            />
+                        )}
+                    </>
                 )}
 
-                {/* Row 5: Definition */}
-                <div>
-                    <textarea
-                        className="form-input text-xs"
-                        rows={2}
-                        value={formData.definition}
-                        onChange={e => setFormData({ ...formData, definition: e.target.value })}
-                        placeholder="Definition..."
-                    />
+                {/* Preview */}
+                <div className="pos-preview">
+                    {getPreviewText()}
                 </div>
+
+                {/* Root */}
+                <input
+                    className="form-input"
+                    value={formData.root}
+                    onChange={e => setFormData({ ...formData, root: e.target.value })}
+                    placeholder="Root"
+                />
+
+                {/* Volls */}
+                <input
+                    className="form-input form-input-sm"
+                    value={formData.volls}
+                    onChange={e => setFormData({ ...formData, volls: e.target.value })}
+                    placeholder="Full form"
+                />
+
+                {/* Definition */}
+                <textarea
+                    className="form-input form-input-sm"
+                    rows={2}
+                    value={formData.definition}
+                    onChange={e => setFormData({ ...formData, definition: e.target.value })}
+                    placeholder="Definition"
+                />
             </div>
 
             {/* Footer */}
@@ -214,7 +397,13 @@ const EditPopover = () => {
                 {!isCreating ? (
                     <button onClick={handleDeleteAnalysis} className="btn-delete">Delete</button>
                 ) : <span></span>}
-                <button onClick={handleSave} className="btn-save">Save</button>
+                <button
+                    onClick={handleSave}
+                    className="btn-save"
+                    disabled={!startNode || (operator !== 'single' && !endNode)}
+                >
+                    Save
+                </button>
             </div>
         </div>
     );
