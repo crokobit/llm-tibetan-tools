@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { AppProviders, useDocument, useEdit } from './contexts/index.jsx';
+import { AppProviders, useDocument, useEdit, useSelection } from './contexts/index.jsx';
 import AnalysisParser from './logic/AnalysisParser.js';
 import LineRenderer from './components/LineRenderer.jsx';
 import EditPopover from './components/EditPopover.jsx';
@@ -10,6 +10,7 @@ import DebugBlockEditor from './components/DebugBlockEditor.jsx';
 function TibetanReaderContent() {
     const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
+    const { copyMode, setCopyMode } = useSelection();
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
@@ -84,7 +85,7 @@ function TibetanReaderContent() {
                 <div className="toolbar-container">
                     <input
                         type="file"
-                        accept=".docx"
+                        accept=".docx,.txt"
                         onChange={handleFileUpload}
                         className="file-input-custom"
                     />
@@ -94,14 +95,24 @@ function TibetanReaderContent() {
                     >
                         Export Text
                     </button>
-                    <label className="debug-mode-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
-                        <input
-                            type="checkbox"
-                            checked={showDebug}
-                            onChange={(e) => setShowDebug(e.target.checked)}
-                        />
-                        Debug Mode
-                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: 'auto' }}>
+                        <label className="debug-mode-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                                type="checkbox"
+                                checked={copyMode}
+                                onChange={(e) => setCopyMode(e.target.checked)}
+                            />
+                            Copy Mode
+                        </label>
+                        <label className="debug-mode-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                                type="checkbox"
+                                checked={showDebug}
+                                onChange={(e) => setShowDebug(e.target.checked)}
+                            />
+                            Debug Mode
+                        </label>
+                    </div>
                 </div>
 
                 {/* Content Area */}

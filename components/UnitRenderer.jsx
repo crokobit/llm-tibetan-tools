@@ -50,11 +50,9 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
                 className={`inline-block mx-0.5 tibetan-word-box cursor-text`}
                 data-indices={indices ? JSON.stringify(indices) : undefined}
                 onClick={(e) => e.stopPropagation()}
-            >
-                <span className={`tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan}`}>
+            ><span className={`tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan}`}>
                     {content}
-                </span>
-            </span>
+                </span></span>
         );
     }
     return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} isAnyEditActive={isAnyEditActive} />;

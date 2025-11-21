@@ -211,7 +211,7 @@ body {
     margin-top: 0;
     /* Removed max-width constraint */
     min-width: 60px;
-    user-select: none;
+    /* user-select: none; - Removed to allow text selection */
 }
 
 .main-analysis-underline {
@@ -241,7 +241,7 @@ body {
     width: 100%;
     border-radius: 0.25rem;
     transition: background-color 200ms;
-    user-select: none;
+    /* user-select: none; - Removed to allow text selection */
 }
 
 .sub-analysis-cell.analyzed {
@@ -351,6 +351,11 @@ body {
 .highlight-editing {
     background-color: #bfdbfe;
     /* bg-blue-200 */
+}
+
+.custom-selected {
+    background-color: #fef08a;
+    /* bg-yellow-200 */
 }
 
 /* Popover */

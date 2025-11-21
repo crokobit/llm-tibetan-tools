@@ -1,14 +1,56 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useDocument } from './DocumentContext.jsx';
+import { useEdit } from './EditContext.jsx'; // Need this to trigger analysis creation
 
 const SelectionContext = createContext();
 
 export function SelectionProvider({ children }) {
     const { documentData } = useDocument();
+    const { setEditingTarget, setAnchorRect } = useEdit(); // Need this to trigger analysis creation
     const [selectionRange, setSelectionRange] = useState(null);
+    const [copyMode, setCopyMode] = useState(false);
+
+    // Helper to calculate true offset relative to the unit container
+    const getTrueOffset = (container, node, offset) => {
+        if (node === container) {
+            // If the node is the container itself, the offset is the child index
+            // We need to sum lengths of all text in children before this index
+            let total = 0;
+            for (let i = 0; i < offset; i++) {
+                total += container.childNodes[i].textContent.length;
+            }
+            return total;
+        }
+
+        // Walk backwards from the node to find all preceding text within the container
+        let total = 0;
+        let current = node;
+
+        // 1. Add offset within the current node
+        if (current.nodeType === 3) {
+            total += offset;
+        } else {
+            // Element node: offset is child index
+            // We need to sum up text of children before this offset
+            for (let i = 0; i < offset; i++) {
+                total += current.childNodes[i].textContent.length;
+            }
+        }
+
+        // 2. Walk up and previous siblings
+        while (current && current !== container) {
+            let sibling = current.previousSibling;
+            while (sibling) {
+                total += sibling.textContent.length;
+                sibling = sibling.previousSibling;
+            }
+            current = current.parentElement;
+        }
+        return total;
+    };
 
     // Helper to parse a DOM node to find indices
-    const getIndicesFromNode = (node) => {
+    const getIndicesFromNode = (node, offset) => {
         if (!node) return null;
 
         // Find the unit container
@@ -19,11 +61,20 @@ export function SelectionProvider({ children }) {
 
         // Check for sub-index
         const subNode = node.nodeType === 3 ? node.parentElement.closest('[data-subindex]') : node.closest('[data-subindex]');
+        let trueOffset = 0;
+
         if (subNode) {
             indices.subIndex = parseInt(subNode.dataset.subindex, 10);
+            trueOffset = getTrueOffset(subNode, node, offset);
+        } else {
+            // For main unit (no sub-index), calculate offset relative to the unit container
+            // But wait, UnitRenderer puts text inside a span inside the container span.
+            // The container has data-indices.
+            // The text is inside.
+            trueOffset = getTrueOffset(unitNode, node, offset);
         }
 
-        return indices;
+        return { ...indices, offset: trueOffset };
     };
 
     // Handle selection change
@@ -35,17 +86,17 @@ export function SelectionProvider({ children }) {
         }
 
         const range = selection.getRangeAt(0);
-        const startIndices = getIndicesFromNode(range.startContainer);
-        const endIndices = getIndicesFromNode(range.endContainer);
+        const startData = getIndicesFromNode(range.startContainer, range.startOffset);
+        const endData = getIndicesFromNode(range.endContainer, range.endOffset);
 
-        if (!startIndices || !endIndices) {
+        if (!startData || !endData) {
             setSelectionRange(null);
             return;
         }
 
         // Normalize start and end
-        let start = { ...startIndices, offset: range.startOffset };
-        let end = { ...endIndices, offset: range.endOffset };
+        let start = startData;
+        let end = endData;
 
         // Compare to ensure start comes before end
         const compare = (a, b) => {
@@ -69,6 +120,87 @@ export function SelectionProvider({ children }) {
         document.addEventListener('selectionchange', handleSelectionChange);
         return () => document.removeEventListener('selectionchange', handleSelectionChange);
     }, [handleSelectionChange]);
+
+    // Handle MouseUp to trigger Analysis Creation
+    useEffect(() => {
+        const handleMouseUp = () => {
+            if (copyMode) return; // Do nothing in Copy Mode
+            if (!selectionRange) return;
+
+            const { start, end } = selectionRange;
+
+            // Only trigger if selection is within the same unit (or sub-unit)
+            // and actually selects something
+            if (start.blockIdx === end.blockIdx &&
+                start.lineIdx === end.lineIdx &&
+                start.unitIdx === end.unitIdx &&
+                start.subIndex === end.subIndex) {
+
+                const length = end.offset - start.offset;
+                if (length > 0) {
+                    // Trigger creation!
+                    // We need the text content to pass to creationDetails
+                    // But wait, setEditingTarget expects us to set isCreating: true
+                    // and provide creationDetails.
+
+                    // We can't easily get the text here without traversing data.
+                    // But we have indices.
+
+                    // Actually, we should just set the target and let the UI handle the rest?
+                    // No, we need to pass the selected text range.
+
+                    // Let's find the text from documentData? 
+                    // Accessing documentData inside useEffect might be stale if not in dependency array.
+                    // But documentData is from context.
+
+                    const block = documentData[start.blockIdx];
+                    const line = block.lines[start.lineIdx];
+                    const unit = line.units[start.unitIdx];
+
+                    let originalText = unit.original;
+                    if (start.subIndex !== undefined && start.subIndex !== null) {
+                        // It's a sub-unit. We need to find it.
+                        // Logic from WordCard:
+                        let subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
+                        if (!subUnits) subUnits = [{ original: unit.original }];
+                        originalText = subUnits[start.subIndex].original;
+                    }
+
+                    const selectedText = originalText.substring(start.offset, end.offset);
+
+                    // Set Anchor Rect for Popup
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        setAnchorRect(rect);
+                    }
+
+                    setEditingTarget({
+                        indices: {
+                            blockIdx: start.blockIdx,
+                            lineIdx: start.lineIdx,
+                            unitIdx: start.unitIdx,
+                            subIndex: start.subIndex
+                        },
+                        isCreating: true,
+                        creationDetails: {
+                            startOffset: start.offset,
+                            selectedText: selectedText
+                        },
+                        highlightColor: 'highlight-creating'
+                    });
+
+                    // Clear native selection to avoid visual clutter?
+                    // window.getSelection().removeAllRanges();
+                    // setSelectionRange(null);
+                }
+            }
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => document.removeEventListener('mouseup', handleMouseUp);
+    }, [selectionRange, copyMode, documentData, setEditingTarget, setAnchorRect]);
 
     // Helper to determine if a unit/sub-unit is selected and get the highlight range
     const getHighlightRange = useCallback((indices, subIndex = null, textLength) => {
@@ -140,9 +272,54 @@ export function SelectionProvider({ children }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // Handle Copy Event to remove newlines and exclude analysis text
+    useEffect(() => {
+        const handleCopy = (e) => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed) return;
+
+            // We need to filter out the analysis text which might be included in the selection
+            // 1. Clone the selected content
+            const range = selection.getRangeAt(0);
+            const fragment = range.cloneContents();
+
+            // 2. Create a temporary container
+            const div = document.createElement('div');
+            div.appendChild(fragment);
+
+            // 3. Remove analysis elements
+            // We target the classes used for analysis containers and text
+            const analysisSelectors = [
+                '.main-analysis-box',
+                '.sub-analysis-cell',
+                '.analysis-label',
+                '.analysis-def',
+                '.tense-label'
+            ];
+
+            div.querySelectorAll(analysisSelectors.join(', ')).forEach(el => el.remove());
+
+            // 4. Get text content
+            const text = div.textContent || div.innerText;
+
+            // 5. Remove newlines
+            const cleanedText = text.replace(/[\r\n]+/g, '');
+
+            if (cleanedText) {
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', cleanedText);
+            }
+        };
+
+        document.addEventListener('copy', handleCopy);
+        return () => document.removeEventListener('copy', handleCopy);
+    }, []);
+
     const value = {
         selectionRange,
-        getHighlightRange
+        getHighlightRange,
+        copyMode,
+        setCopyMode
     };
 
     return (

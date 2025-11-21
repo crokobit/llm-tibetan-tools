@@ -18,16 +18,23 @@ export function DocumentProvider({ children }) {
         const file = e.target.files[0];
         if (!file) return;
 
-        if (!isMammothLoaded) {
-            alert("File reader library is still loading, please wait a moment and try again.");
-            return;
-        }
-
         setLoading(true);
         try {
-            const arrayBuffer = await file.arrayBuffer();
-            const result = await window.mammoth.extractRawText({ arrayBuffer });
-            const rawTextContent = result.value;
+            let rawTextContent = '';
+            if (file.name.endsWith('.docx')) {
+                if (!isMammothLoaded) {
+                    alert("File reader library is still loading, please wait a moment and try again.");
+                    setLoading(false);
+                    return;
+                }
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await window.mammoth.extractRawText({ arrayBuffer });
+                rawTextContent = result.value;
+            } else {
+                // Assume text file for everything else
+                rawTextContent = await file.text();
+            }
+
             setRawText(rawTextContent); // Store raw text for debug mode
             const parsedData = DocumentParser.parse(rawTextContent);
             setDocumentData(parsedData);
@@ -38,6 +45,29 @@ export function DocumentProvider({ children }) {
             setLoading(false);
         }
     };
+
+    // Load default test file on mount
+    React.useEffect(() => {
+        const loadDefaultFile = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch('test_plain_text.txt');
+                if (!response.ok) {
+                    throw new Error('Failed to load default file');
+                }
+                const text = await response.text();
+                setRawText(text);
+                const parsedData = DocumentParser.parse(text);
+                setDocumentData(parsedData);
+            } catch (error) {
+                console.error("Error loading default file:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadDefaultFile();
+    }, []);
 
     const value = {
         documentData,

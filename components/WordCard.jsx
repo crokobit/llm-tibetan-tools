@@ -53,7 +53,12 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''}`}
             style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
             // Clicking background selects the main unit
-            onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }}
+            onClick={(e) => {
+                const selection = window.getSelection();
+                if (selection && !selection.isCollapsed) return;
+                e.stopPropagation();
+                onClick(e, unit, null, null);
+            }}
         >
             {/* --- Row 1: Tibetan Sub-Words (The "Main Word") --- */}
             {subUnits.map((u, i) => {
@@ -94,6 +99,13 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                         data-subindex={i}
                         className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
                         onClick={(e) => {
+                            // If text is selected, do not trigger click
+                            const selection = window.getSelection();
+                            if (selection && !selection.isCollapsed) {
+                                e.stopPropagation();
+                                return;
+                            }
+
                             // If tsheg, let it bubble to main unit (do nothing here). If word, handle sub-click.
                             if (!isTsheg && hasSubAnalysis) {
                                 e.stopPropagation();
@@ -104,11 +116,9 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                                 // or explicitly call it here if needed, but container handles it.
                             }
                         }}
-                    >
-                        <span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
+                    ><span className={`tibetan-font ${isNested ? 'tibetan-medium' : FONT_SIZES.tibetan}`}>
                             {content}
-                        </span>
-                    </span>
+                        </span></span>
                 );
             })}
 
@@ -116,7 +126,12 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             <span
                 style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
                 className="main-analysis-box"
-                onClick={(e) => { e.stopPropagation(); onClick(e, unit, null, null); }} // Click here edits main
+                onClick={(e) => {
+                    const selection = window.getSelection();
+                    if (selection && !selection.isCollapsed) return;
+                    e.stopPropagation();
+                    onClick(e, unit, null, null);
+                }} // Click here edits main
             >
                 {/* Main Analysis Underline */}
                 <span className={`main-analysis-underline block ${mainBorderColor}`}></span>
@@ -155,7 +170,12 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                         className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
                         onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
                         onMouseLeave={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(null) : undefined}
-                        onClick={(e) => { e.stopPropagation(); onClick(e, u, i, subType); }}
+                        onClick={(e) => {
+                            const selection = window.getSelection();
+                            if (selection && !selection.isCollapsed) return;
+                            e.stopPropagation();
+                            onClick(e, u, i, subType);
+                        }}
                     >
                         {/* Sub Analysis Underline (Colored Bar) */}
                         {u.analysis && (
