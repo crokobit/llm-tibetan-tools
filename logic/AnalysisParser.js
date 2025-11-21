@@ -82,4 +82,99 @@ export default class AnalysisParser {
         }
         return output;
     }
+
+    static parseDebugText(text) {
+        const lines = text.split('\n').filter(l => l.trim());
+        const roots = [];
+        const stack = []; // Stores { node, depth }
+
+        lines.forEach(line => {
+            // 1. Determine depth
+            const matchIndent = line.match(/^(\t*)/);
+            const depth = matchIndent ? matchIndent[1].length : 0;
+
+            // 2. Parse content
+            const content = line.trim();
+            // Split at first space to get original vs analysis
+            // Assuming original has no spaces, or we find the first space
+            const firstSpaceIdx = content.indexOf(' ');
+            let original = '';
+            let analysisString = '';
+
+            if (firstSpaceIdx === -1) {
+                original = content;
+            } else {
+                original = content.substring(0, firstSpaceIdx);
+                analysisString = content.substring(firstSpaceIdx + 1);
+            }
+
+            const analysis = this.parse(analysisString);
+            const node = {
+                type: 'word',
+                original: original,
+                analysis: analysis,
+                nestedData: []
+            };
+
+            // 3. Place in tree
+            if (depth === 0) {
+                roots.push(node);
+                stack.length = 0; // Reset stack for new root
+                stack.push({ node, depth });
+            } else {
+                // Find parent
+                while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+                    stack.pop();
+                }
+
+                if (stack.length > 0) {
+                    const parent = stack[stack.length - 1].node;
+                    parent.nestedData.push(node);
+                    stack.push({ node, depth });
+                } else {
+                    // Fallback: treat as root if no parent found (shouldn't happen with valid indent)
+                    roots.push(node);
+                    stack.push({ node, depth });
+                }
+            }
+        });
+
+        return roots;
+    }
+
+    static rehydrateBlock(originalLines, newWordNodes) {
+        const newLines = JSON.parse(JSON.stringify(originalLines)); // Deep clone
+        const wordQueue = [...newWordNodes];
+
+        newLines.forEach(line => {
+            const newUnits = [];
+            line.units.forEach(unit => {
+                if (unit.type === 'word') {
+                    if (wordQueue.length > 0) {
+                        const newWord = wordQueue.shift();
+                        newUnits.push(newWord);
+                    } else {
+                        // No more words in debug text, remove this word
+                    }
+                } else {
+                    // Keep non-word units (punctuation, etc.)
+                    newUnits.push(unit);
+                }
+            });
+            line.units = newUnits;
+        });
+
+        // If leftovers, append to the last line
+        if (wordQueue.length > 0) {
+            const lastLine = newLines[newLines.length - 1];
+            if (lastLine) {
+                lastLine.units.push(...wordQueue);
+            } else {
+                // If block was empty, create a new line
+                newLines.push({ units: wordQueue });
+            }
+        }
+
+        return newLines;
+    }
 }

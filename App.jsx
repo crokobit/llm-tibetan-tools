@@ -4,9 +4,11 @@ import AnalysisParser from './logic/AnalysisParser.js';
 import LineRenderer from './components/LineRenderer.jsx';
 import EditPopover from './components/EditPopover.jsx';
 
+import DebugBlockEditor from './components/DebugBlockEditor.jsx';
+
 // Internal component that uses contexts
 function TibetanReaderContent() {
-    const { documentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText } = useDocument();
+    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
@@ -49,6 +51,14 @@ function TibetanReaderContent() {
         a.href = url;
         a.download = 'analyzed_text.txt';
         a.click();
+    };
+
+    const handleBlockUpdate = (blockIdx, newBlock) => {
+        setDocumentData(prev => {
+            const newData = [...prev];
+            newData[blockIdx] = newBlock;
+            return newData;
+        });
     };
 
     return (
@@ -115,28 +125,10 @@ function TibetanReaderContent() {
                                     />
                                 ))}
                                 {showDebug && (
-                                    <div className="block-debug-output" style={{
-                                        marginTop: '1rem',
-                                        padding: '1rem',
-                                        backgroundColor: '#f9fafb',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '0.375rem',
-                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                                        whiteSpace: 'pre-wrap',
-                                        fontSize: '0.875rem',
-                                        color: '#374151'
-                                    }}>
-                                        {(() => {
-                                            let output = '>>>\n';
-                                            let rawText = '';
-                                            block.lines.forEach(line => {
-                                                line.units.forEach(u => rawText += u.original);
-                                            });
-                                            output += rawText + '\n';
-                                            output += AnalysisParser.format(block.lines);
-                                            return output;
-                                        })()}
-                                    </div>
+                                    <DebugBlockEditor
+                                        block={block}
+                                        onUpdate={(newBlock) => handleBlockUpdate(blockIdx, newBlock)}
+                                    />
                                 )}
                             </div>
                         ))
