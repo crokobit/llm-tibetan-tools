@@ -11,7 +11,7 @@ const EditPopover = () => {
     const possibleParents = editingTarget ? editingTarget.possibleParents : [];
 
     const [formData, setFormData] = useState({
-        volls: '', root: '', pos: '', tense: [], definition: ''
+        text: '', volls: '', root: '', pos: '', tense: [], definition: ''
     });
     const [parentMode, setParentMode] = useState('main'); // 'main' or 'sub'
     const popoverRef = useRef(null);
@@ -20,7 +20,7 @@ const EditPopover = () => {
 
     useEffect(() => {
         if (isCreating) {
-            setFormData({ volls: '', root: '', pos: 'other', tense: [], definition: '' });
+            setFormData({ text: '', volls: '', root: '', pos: 'other', tense: [], definition: '' });
             // Default to 'sub' if available as it's likely the intent when selecting inside a word
             if (possibleParents && possibleParents.length > 0) {
                 const subOption = possibleParents.find(p => p.id === 'sub');
@@ -31,6 +31,7 @@ const EditPopover = () => {
             }
         } else if (data && data.analysis) {
             setFormData({
+                text: data.original || '',
                 volls: data.analysis.volls || '',
                 root: data.analysis.root || '',
                 pos: data.analysis.pos || '',
@@ -144,7 +145,19 @@ const EditPopover = () => {
                     </div>
                 )}
 
-                {/* Row 1: Root & POS */}
+                {/* Row 1: Text (Word) - Read-only display */}
+                <div style={{
+                    padding: '0.5rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '0.375rem',
+                    fontWeight: '500',
+                    fontSize: '1rem',
+                    color: '#1f2937'
+                }}>
+                    {formData.text || '(no text)'}
+                </div>
+
+                {/* Row 2: Root & POS */}
                 <div className="flex gap-2">
                     <div className="flex-1">
                         <input
@@ -159,7 +172,7 @@ const EditPopover = () => {
                     </div>
                 </div>
 
-                {/* Row 2: Volls (Optional) */}
+                {/* Row 3: Volls (Optional) */}
                 <div>
                     <input
                         className="form-input text-xs"
@@ -169,7 +182,7 @@ const EditPopover = () => {
                     />
                 </div>
 
-                {/* Row 3: Tense (Conditional) */}
+                {/* Row 4: Tense (Conditional) */}
                 {isVerb && (
                     <div className="flex flex-wrap gap-1">
                         {['past', 'future', 'imperative'].map(t => (
@@ -184,7 +197,7 @@ const EditPopover = () => {
                     </div>
                 )}
 
-                {/* Row 4: Definition */}
+                {/* Row 5: Definition */}
                 <div>
                     <textarea
                         className="form-input text-xs"

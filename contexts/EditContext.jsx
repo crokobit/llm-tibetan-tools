@@ -125,6 +125,9 @@ export function EditProvider({ children }) {
             if (subIndex !== null && subIndex !== undefined) {
                 // Editing sub-unit
                 const subUnit = unit.nestedData[subIndex];
+                if (data.text !== undefined) {
+                    subUnit.original = data.text;
+                }
                 subUnit.analysis = {
                     ...subUnit.analysis,
                     volls: data.volls,
@@ -135,6 +138,9 @@ export function EditProvider({ children }) {
                 };
             } else {
                 // Editing main unit
+                if (data.text !== undefined) {
+                    unit.original = data.text;
+                }
                 unit.analysis = {
                     ...unit.analysis,
                     volls: data.volls,

@@ -5,6 +5,7 @@ export default function DebugBlockEditor({ block, onUpdate }) {
     const [text, setText] = useState(() => generateDebugText(block));
     const textareaRef = useRef(null);
     const lastBlockRef = useRef(block);
+    const isInternalUpdateRef = useRef(false); // Track if update is from textarea
 
     // Helper to generate the full debug text
     function generateDebugText(blk) {
@@ -20,15 +21,12 @@ export default function DebugBlockEditor({ block, onUpdate }) {
 
     // Sync text from block when block changes externally
     useEffect(() => {
-        // We only update if the block has actually changed in a way that matters
-        // AND we are not currently editing (focused)
-        // OR if the block changed significantly (e.g. completely different content not from our edit)
-
-        // Simple heuristic: if not focused, always sync.
-        if (document.activeElement !== textareaRef.current) {
+        // Only update if the change is NOT from typing in the textarea
+        if (!isInternalUpdateRef.current) {
             setText(generateDebugText(block));
         }
-
+        // Reset the flag
+        isInternalUpdateRef.current = false;
         lastBlockRef.current = block;
     }, [block]);
 
@@ -51,6 +49,8 @@ export default function DebugBlockEditor({ block, onUpdate }) {
         const rehydratedLines = AnalysisParser.rehydrateBlock(block.lines, newWordNodes);
         const newBlock = { ...block, lines: rehydratedLines };
 
+        // Mark this as an internal update
+        isInternalUpdateRef.current = true;
         onUpdate(newBlock);
     };
 
