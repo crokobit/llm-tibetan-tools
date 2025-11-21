@@ -172,7 +172,7 @@ const EditPopover = () => {
                 {/* Row 3: Tense (Conditional) */}
                 {isVerb && (
                     <div className="flex flex-wrap gap-1">
-                        {['present', 'past', 'future', 'imperative'].map(t => (
+                        {['past', 'future', 'imperative'].map(t => (
                             <button
                                 key={t}
                                 onClick={() => toggleTense(t)}
