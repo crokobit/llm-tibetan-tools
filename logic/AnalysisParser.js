@@ -71,7 +71,7 @@ export default class AnalysisParser {
         const indent = '\t'.repeat(depth);
         const analysisString = this.serialize(node.analysis, node.original);
 
-        output += `${indent}${node.original} ${analysisString}\n`;
+        output += `${indent}<${node.original}>[${analysisString}]\n`;
 
         if (node.nestedData && node.nestedData.length > 0) {
             node.nestedData.forEach(child => {
@@ -89,24 +89,12 @@ export default class AnalysisParser {
         const stack = []; // Stores { node, depth }
 
         lines.forEach(line => {
-            // 1. Determine depth
-            const matchIndent = line.match(/^(\t*)/);
-            const depth = matchIndent ? matchIndent[1].length : 0;
+            const match = line.match(RegexGrammar.ANALYSIS_LINE);
+            if (!match) return;
 
-            // 2. Parse content
-            const content = line.trim();
-            // Split at first space to get original vs analysis
-            // Assuming original has no spaces, or we find the first space
-            const firstSpaceIdx = content.indexOf(' ');
-            let original = '';
-            let analysisString = '';
-
-            if (firstSpaceIdx === -1) {
-                original = content;
-            } else {
-                original = content.substring(0, firstSpaceIdx);
-                analysisString = content.substring(firstSpaceIdx + 1);
-            }
+            const depth = match[1].length;
+            const original = match[2];
+            const analysisString = match[3];
 
             const analysis = this.parse(analysisString);
             const node = {

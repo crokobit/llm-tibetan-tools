@@ -16,7 +16,9 @@ export default function DebugBlockEditor({ block, onUpdate }) {
             line.units.forEach(u => rawText += u.original);
         });
         output += rawText + '\n';
+        output += '>>>>\n';
         output += AnalysisParser.format(blk.lines);
+        output += '>>>>>';
         return output;
     }
 
@@ -77,15 +79,15 @@ export default function DebugBlockEditor({ block, onUpdate }) {
             isTypingRef.current = false;
         }, 150); // 150ms after last keystroke
 
-        const lines = newText.split('\n');
-        let analysisLines = lines;
-        // Skip header if present (>>> and raw text line)
-        if (lines.length > 0 && lines[0].trim() === '>>>') {
-            // We assume the second line is raw text, so we skip 2 lines
-            analysisLines = lines.slice(2);
-        }
+        // Parse the block structure
+        const parts = newText.split('>>>>');
+        if (parts.length < 2) return; // Not enough parts
 
-        const debugText = analysisLines.join('\n');
+        let analysisPart = parts[1];
+        // Remove trailing >>>>> if present
+        analysisPart = analysisPart.split('>>>>>')[0];
+
+        const debugText = analysisPart.trim();
         const newWordNodes = AnalysisParser.parseDebugText(debugText);
 
         // Rehydrate and notify parent
