@@ -101,8 +101,8 @@ function TibetanReaderContent() {
                     >
                         Export Text
                     </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: 'auto' }}>
-                        <label className="debug-mode-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="toolbar-controls-container">
+                        <label className="debug-mode-label">
                             <input
                                 type="checkbox"
                                 checked={copyMode}
@@ -110,7 +110,7 @@ function TibetanReaderContent() {
                             />
                             Copy Mode
                         </label>
-                        <label className="debug-mode-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <label className="debug-mode-label">
                             <input
                                 type="checkbox"
                                 checked={showDebug}

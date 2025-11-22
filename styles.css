@@ -176,6 +176,9 @@ body {
     transform: none;
 }
 
+
+/* Note: .word-card-grid requires dynamic inline style (gridTemplateColumns)
+   to set the column count based on the number of sub-units */
 .word-card-grid {
     display: inline-grid;
     column-gap: 0.125rem;
@@ -359,6 +362,8 @@ body {
 }
 
 /* Popover */
+/* Note: .popover-container requires dynamic inline styles (top, left, opacity)
+   for positioning relative to the selected text anchor */
 .popover-container {
     position: absolute;
     z-index: 50;
@@ -768,12 +773,22 @@ body {
 }
 
 .debug-mode-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.875rem;
     /* text-sm */
     color: #4b5563;
     /* text-gray-600 */
     cursor: pointer;
     user-select: none;
+}
+
+.toolbar-controls-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
 }
 
 .btn-copy {
