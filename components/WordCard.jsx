@@ -4,12 +4,12 @@ import { truncateDefinition } from '../utils/helpers.js';
 import renderHighlightedText from '../utils/renderHighlightedText.jsx';
 import AnalysisLabel from './AnalysisLabel.jsx';
 
-import { useSelection } from '../contexts/SelectionContext.jsx';
+// import { useSelection } from '../contexts/SelectionContext.jsx';
 
 const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive }) => {
     const { analysis, original, nestedData, supplementaryData } = unit;
     const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
-    const { getHighlightRange } = useSelection();
+    // const { getHighlightRange } = useSelection();
 
     const mainPosKey = analysis.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
     const mainBorderColor = POS_COLORS[mainPosKey] || POS_COLORS.other;
@@ -71,8 +71,8 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 const isThisSubWordEditing = isEditingExisting && editingTarget.indices.subIndex === i;
 
                 // Check for partial selection
-                const selectionRange = getHighlightRange(indices, i, u.original.length);
-                const isSelected = !!selectionRange;
+                // const selectionRange = getHighlightRange(indices, i, u.original.length);
+                // const isSelected = !!selectionRange;
 
                 let content = u.original;
                 if (isCreatingSub && editingTarget && editingTarget.creationDetails) {
@@ -83,15 +83,16 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                         myOffset,
                         highlightColor
                     );
-                } else if (isSelected) {
-                    content = renderHighlightedText(
-                        u.original,
-                        selectionRange[0],
-                        selectionRange[1],
-                        0,
-                        'custom-selected'
-                    );
                 }
+                // else if (isSelected) {
+                //     content = renderHighlightedText(
+                //         u.original,
+                //         selectionRange[0],
+                //         selectionRange[1],
+                //         0,
+                //         'custom-selected'
+                //     );
+                // }
 
                 return (
                     <span

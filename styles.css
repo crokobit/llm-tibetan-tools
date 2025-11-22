@@ -801,9 +801,10 @@ body {
 }
 
 /* Selection Highlight - Using default browser style */
-/* .tibetan-word-box ::selection {
+/* Selection Highlight - Using default browser style */
+.tibetan-word-box ::selection {
     background-color: #bbf7d0;
-} */
+}
 
 
 .empty-state {
