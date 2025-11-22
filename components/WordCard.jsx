@@ -54,6 +54,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
             // Clicking background selects the main unit
             onClick={(e) => {
+                console.log('WordCard Background Click', { unit, indices });
                 const selection = window.getSelection();
                 if (selection && !selection.isCollapsed) return;
                 e.stopPropagation();
@@ -75,12 +76,12 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 // const isSelected = !!selectionRange;
 
                 let content = u.original;
-                if (isCreatingSub && editingTarget && editingTarget.creationDetails) {
+                if (isCreatingSub && editingTarget && editingTarget.creationDetails && editingTarget.indices.subIndex === i) {
                     content = renderHighlightedText(
                         u.original,
                         editingTarget.creationDetails.startOffset,
                         editingTarget.creationDetails.startOffset + editingTarget.creationDetails.selectedText.length,
-                        myOffset,
+                        0,
                         highlightColor
                     );
                 }
@@ -100,9 +101,16 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                         data-subindex={i}
                         className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
                         onClick={(e) => {
+                            console.log('Tibetan Word Box Click', { i, u, hasSubAnalysis });
                             // If text is selected, do not trigger click
                             const selection = window.getSelection();
                             if (selection && !selection.isCollapsed) {
+                                e.stopPropagation();
+                                return;
+                            }
+
+                            // If we are in creation mode for this unit, ignore the click to prevent resetting
+                            if (isCreatingSub) {
                                 e.stopPropagation();
                                 return;
                             }

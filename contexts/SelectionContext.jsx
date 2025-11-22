@@ -12,6 +12,7 @@ export function SelectionProvider({ children }) {
 
     // Helper to calculate true offset relative to the unit container
     const getTrueOffset = (container, node, offset) => {
+        // console.log('getTrueOffset', { container, node, offset });
         if (node === container) {
             // If the node is the container itself, the offset is the child index
             // We need to sum lengths of all text in children before this index
@@ -46,6 +47,7 @@ export function SelectionProvider({ children }) {
             }
             current = current.parentElement;
         }
+        // console.log('getTrueOffset result:', total);
         return total;
     };
 
@@ -74,6 +76,7 @@ export function SelectionProvider({ children }) {
             trueOffset = getTrueOffset(unitNode, node, offset);
         }
 
+        console.log('getIndicesFromNode', { node, offset, indices, trueOffset });
         return { ...indices, offset: trueOffset };
     };
 
@@ -86,8 +89,17 @@ export function SelectionProvider({ children }) {
         }
 
         const range = selection.getRangeAt(0);
+        console.log('Raw Selection:', {
+            startContainer: range.startContainer,
+            startOffset: range.startOffset,
+            endContainer: range.endContainer,
+            endOffset: range.endOffset
+        });
+
         const startData = getIndicesFromNode(range.startContainer, range.startOffset);
         const endData = getIndicesFromNode(range.endContainer, range.endOffset);
+
+        console.log('Parsed Selection Data:', { startData, endData });
 
         if (!startData || !endData) {
             setSelectionRange(null);
@@ -128,6 +140,7 @@ export function SelectionProvider({ children }) {
             if (!selectionRange) return;
 
             const { start, end } = selectionRange;
+            console.log('handleMouseUp', { start, end });
 
             // Only trigger if selection is within the same unit (or sub-unit)
             // and actually selects something
@@ -158,15 +171,30 @@ export function SelectionProvider({ children }) {
                     const unit = line.units[start.unitIdx];
 
                     let originalText = unit.original;
+                    let subUnits = null;
+
+                    // Check for sub-analysis structure
+                    const hasSubAnalysis = (unit.nestedData && unit.nestedData.length > 0) || (unit.supplementaryData && unit.supplementaryData.length > 0);
+
                     if (start.subIndex !== undefined && start.subIndex !== null) {
                         // It's a sub-unit. We need to find it.
-                        // Logic from WordCard:
-                        let subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
+                        subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
                         if (!subUnits) subUnits = [{ original: unit.original }];
                         originalText = subUnits[start.subIndex].original;
                     }
 
                     const selectedText = originalText.substring(start.offset, end.offset);
+                    console.log('Selected Text for Analysis:', selectedText);
+
+                    // Determine if we are Creating new or Editing existing
+                    let isCreating = true;
+                    if (hasSubAnalysis) {
+                        // If we have sub-analysis, and we selected the ENTIRE text of a sub-unit,
+                        // assume we want to EDIT that existing sub-analysis.
+                        if (start.offset === 0 && end.offset === originalText.length) {
+                            isCreating = false;
+                        }
+                    }
 
                     // Set Anchor Rect for Popup
                     const selection = window.getSelection();
@@ -183,18 +211,20 @@ export function SelectionProvider({ children }) {
                             unitIdx: start.unitIdx,
                             subIndex: start.subIndex
                         },
-                        isCreating: true,
+                        isCreating: isCreating,
                         creationDetails: {
                             startOffset: start.offset,
                             selectedText: selectedText
                         },
-                        highlightColor: 'highlight-creating'
+                        highlightColor: isCreating ? 'highlight-creating' : 'highlight-editing'
                     });
 
                     // Clear native selection to avoid visual clutter?
                     // window.getSelection().removeAllRanges();
                     // setSelectionRange(null);
                 }
+            } else {
+                console.log('Selection spans multiple units or is invalid for analysis creation');
             }
         };
 
