@@ -3,12 +3,13 @@ import { AppProviders, useDocument, useEdit, useSelection } from './contexts/ind
 import AnalysisParser from './logic/AnalysisParser.js';
 import LineRenderer from './components/LineRenderer.jsx';
 import EditPopover from './components/EditPopover.jsx';
+import RichTextBlock from './components/RichTextBlock.jsx';
 
 import DebugBlockEditor from './components/DebugBlockEditor.jsx';
 
 // Internal component that uses contexts
 function TibetanReaderContent() {
-    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText } = useDocument();
+    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
     const { copyMode, setCopyMode } = useSelection();
     const contentRef = useRef(null);
@@ -32,15 +33,20 @@ function TibetanReaderContent() {
     const debugText = useMemo(() => {
         let output = '';
         documentData.forEach(block => {
-            output += '>>>\n';
-            // Reconstruct raw text
-            let rawText = '';
-            block.lines.forEach(line => {
-                line.units.forEach(u => rawText += u.original);
-            });
-            output += rawText + '\n';
-            // Analysis
-            output += AnalysisParser.format(block.lines) + '\n';
+            if (block.type === 'richtext') {
+                // Export rich text as HTML comment for now
+                output += '<!-- RICHTEXT:\n' + block.content + '\n-->\n\n';
+            } else if (block.type === 'tibetan') {
+                output += '>>>\n';
+                // Reconstruct raw text
+                let rawText = '';
+                block.lines.forEach(line => {
+                    line.units.forEach(u => rawText += u.original);
+                });
+                output += rawText + '\n';
+                // Analysis
+                output += AnalysisParser.format(block.lines) + '\n';
+            }
         });
         return output;
     }, [documentData]);
@@ -116,33 +122,59 @@ function TibetanReaderContent() {
                 </div>
 
                 {/* Content Area */}
-                {/* Content Area */}
                 <div className="content-area tibetan-content" ref={contentRef}>
                     {loading ? (
                         <div className="loading-container">
                             <div className="loading-spinner"></div>
                         </div>
                     ) : (
-                        documentData.map((block, blockIdx) => (
-                            <div key={blockIdx} className="block-layout">
-                                {block.lines.map((line, lineIdx) => (
-                                    <LineRenderer
-                                        key={lineIdx}
-                                        line={line}
-                                        blockIdx={blockIdx}
-                                        lineIdx={lineIdx}
-                                        editingTarget={editingTarget}
-                                        isAnyEditActive={!!editingTarget}
-                                    />
-                                ))}
-                                {showDebug && (
-                                    <DebugBlockEditor
-                                        block={block}
-                                        onUpdate={(newBlock) => handleBlockUpdate(blockIdx, newBlock)}
-                                    />
-                                )}
-                            </div>
-                        ))
+                        <>
+                            {documentData.length === 0 && (
+                                <div className="empty-state">
+                                    <p>No content yet. Add a block to get started!</p>
+                                    <button onClick={() => insertRichTextBlock(-1)} className="btn-insert">+ Rich Text</button>
+                                    <button onClick={() => insertTibetanBlock(-1)} className="btn-insert">+ Tibetan</button>
+                                </div>
+                            )}
+                            {documentData.map((block, blockIdx) => (
+                                <div key={blockIdx}>
+                                    {/* Render block based on type */}
+                                    {block.type === 'richtext' ? (
+                                        <RichTextBlock
+                                            content={block.content}
+                                            onChange={(newContent) => updateRichTextBlock(blockIdx, newContent)}
+                                            onDelete={() => deleteBlock(blockIdx)}
+                                            blockIdx={blockIdx}
+                                        />
+                                    ) : (
+                                        <div className="block-layout">
+                                            {block.lines.map((line, lineIdx) => (
+                                                <LineRenderer
+                                                    key={lineIdx}
+                                                    line={line}
+                                                    blockIdx={blockIdx}
+                                                    lineIdx={lineIdx}
+                                                    editingTarget={editingTarget}
+                                                    isAnyEditActive={!!editingTarget}
+                                                />
+                                            ))}
+                                            {showDebug && (
+                                                <DebugBlockEditor
+                                                    block={block}
+                                                    onUpdate={(newBlock) => handleBlockUpdate(blockIdx, newBlock)}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Insert buttons after each block */}
+                                    <div className="block-insert-controls">
+                                        <button onClick={() => insertRichTextBlock(blockIdx)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
+                                        <button onClick={() => insertTibetanBlock(blockIdx)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </>
                     )}
                 </div>
             </div>

@@ -79,7 +79,38 @@ export function DocumentProvider({ children }) {
         handleFileUpload,
         showDebug,
         setShowDebug,
-        rawText
+        rawText,
+        // Block manipulation helpers
+        insertRichTextBlock: (afterIdx) => {
+            setDocumentData(prev => {
+                const newData = [...prev];
+                newData.splice(afterIdx + 1, 0, {
+                    type: 'richtext',
+                    content: '<p><br></p>'
+                });
+                return newData;
+            });
+        },
+        insertTibetanBlock: (afterIdx) => {
+            setDocumentData(prev => {
+                const newData = [...prev];
+                newData.splice(afterIdx + 1, 0, {
+                    type: 'tibetan',
+                    lines: [{ units: [{ type: 'text', original: '' }] }]
+                });
+                return newData;
+            });
+        },
+        deleteBlock: (blockIdx) => {
+            setDocumentData(prev => prev.filter((_, idx) => idx !== blockIdx));
+        },
+        updateRichTextBlock: (blockIdx, newContent) => {
+            setDocumentData(prev => {
+                const newData = [...prev];
+                newData[blockIdx] = { ...newData[blockIdx], content: newContent };
+                return newData;
+            });
+        }
     };
 
     return (

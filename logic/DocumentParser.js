@@ -9,7 +9,7 @@ export default class DocumentParser {
         if (matches.length === 0) {
             // Fallback: Treat entire text as raw text with no analysis if no blocks found
             if (fullText.trim().length > 0) {
-                return [{ lines: [{ units: [{ type: 'text', original: fullText }] }] }];
+                return [{ type: 'tibetan', lines: [{ units: [{ type: 'text', original: fullText }] }] }];
             }
             return [];
         }
@@ -17,7 +17,8 @@ export default class DocumentParser {
         matches.forEach(match => {
             const rawText = match[1];
             const analysisText = match[2];
-            blocks.push(this._processBlock(rawText, analysisText));
+            const tibetanBlock = this._processBlock(rawText, analysisText);
+            blocks.push({ type: 'tibetan', ...tibetanBlock });
         });
 
         return blocks;
