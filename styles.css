@@ -800,11 +800,10 @@ body {
     color: #6b7280;
 }
 
-/* Selection Highlight */
-.tibetan-word-box ::selection {
+/* Selection Highlight - Using default browser style */
+/* .tibetan-word-box ::selection {
     background-color: #bbf7d0;
-    /* bg-green-200 */
-}
+} */
 
 
 .empty-state {
@@ -821,8 +820,7 @@ body {
     display: none;
 }
 
-/* Selection Highlights */
-/* Selection Highlights */
+/* Selection Highlights - Using default browser style */
 .tibetan-content {
     /* Allow native selection for partial text selection */
     user-select: text;
@@ -833,7 +831,8 @@ body {
     /* light green */
 }
 
-.tibetan-content.creating-mode ::selection {
+/* Removed custom ::selection styles to use default browser highlighting */
+/* .tibetan-content.creating-mode ::selection {
     background-color: transparent;
 }
 
@@ -843,7 +842,7 @@ body {
 
 .tibetan-content ::selection {
     background-color: transparent;
-}
+} */
 
 .block {
     display: block;
