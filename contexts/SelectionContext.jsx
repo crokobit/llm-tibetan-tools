@@ -150,46 +150,8 @@ export function SelectionProvider({ children }) {
                 // Check if selection spans multiple sub-units (for main analysis edit)
                 const spansMultipleSubUnits = start.subIndex !== end.subIndex;
 
-                // If selection is in analysis part, we should select the whole unit for editing
+                // If selection is in analysis part, ignore it (user requested no drag-to-edit)
                 if (start.part === 'sub-analysis' || start.part === 'main-analysis') {
-                    // Find the unit data
-                    const block = documentData[start.blockIdx];
-                    const line = block.lines[start.lineIdx];
-                    const unit = line.units[start.unitIdx];
-
-                    let subUnits = null;
-                    const hasSubAnalysis = (unit.nestedData && unit.nestedData.length > 0) || (unit.supplementaryData && unit.supplementaryData.length > 0);
-
-                    if (start.subIndex !== undefined && start.subIndex !== null) {
-                        subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
-                    }
-
-                    let targetUnit = unit;
-                    if (subUnits && start.subIndex !== undefined && start.subIndex !== null) {
-                        targetUnit = subUnits[start.subIndex];
-                    }
-
-                    // Set Anchor Rect for Popup
-                    const selection = window.getSelection();
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        const rect = range.getBoundingClientRect();
-                        setAnchorRect(rect);
-                    }
-
-                    setEditingTarget({
-                        indices: {
-                            blockIdx: start.blockIdx,
-                            lineIdx: start.lineIdx,
-                            unitIdx: start.unitIdx,
-                            subIndex: hasSubAnalysis ? start.subIndex : null
-                        },
-                        isCreating: false, // Always editing if selecting analysis
-                        unit: targetUnit,
-                        creationDetails: null, // No creation details needed for editing
-                        highlightColor: 'highlight-editing'
-                    });
-
                     return;
                 }
 
@@ -289,6 +251,11 @@ export function SelectionProvider({ children }) {
                                 }
                             }
                         }
+                    }
+
+                    // User Request: Only allow adding analysis. Edit mode is only via click.
+                    if (!isCreating) {
+                        return;
                     }
 
                     // Set Anchor Rect for Popup
