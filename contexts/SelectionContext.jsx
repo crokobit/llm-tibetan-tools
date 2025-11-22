@@ -238,9 +238,17 @@ export function SelectionProvider({ children }) {
                     // Determine if we are Creating new or Editing existing
                     let isCreating = true;
                     let targetUnit = unit;
-                    if (subUnits && subUnits[start.subIndex]) {
+
+                    if (hasSubAnalysis && subUnits && start.subIndex !== undefined && start.subIndex !== null) {
+                        // Real sub-unit
                         targetUnit = subUnits[start.subIndex];
                         if (targetUnit.analysis) {
+                            isCreating = false;
+                        }
+                    } else {
+                        // Main unit (no sub-analysis structure, so subIndex 0 refers to main unit)
+                        targetUnit = unit;
+                        if (unit.analysis) {
                             isCreating = false;
                         }
                     }
