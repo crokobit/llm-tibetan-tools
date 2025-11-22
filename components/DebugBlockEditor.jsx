@@ -12,7 +12,8 @@ export default function DebugBlockEditor({ block, onUpdate }) {
     function generateDebugText(blk) {
         let output = '>>>\n';
         let rawText = '';
-        blk.lines.forEach(line => {
+        blk.lines.forEach((line, idx) => {
+            if (idx > 0) rawText += '\n'; // Add newline between lines
             line.units.forEach(u => rawText += u.original);
         });
         output += rawText + '\n';
@@ -83,6 +84,14 @@ export default function DebugBlockEditor({ block, onUpdate }) {
         const parts = newText.split('>>>>');
         if (parts.length < 2) return; // Not enough parts
 
+        // Extract raw text (everything after >>> and before first >>>>)
+        let rawTextPart = parts[0];
+        if (rawTextPart.includes('>>>')) {
+            rawTextPart = rawTextPart.split('>>>')[1] || '';
+        }
+        const rawText = rawTextPart.trim();
+
+        // Extract analysis (between >>>> and >>>>>)
         let analysisPart = parts[1];
         // Remove trailing >>>>> if present
         analysisPart = analysisPart.split('>>>>>')[0];
@@ -90,11 +99,29 @@ export default function DebugBlockEditor({ block, onUpdate }) {
         const debugText = analysisPart.trim();
         const newWordNodes = AnalysisParser.parseDebugText(debugText);
 
-        // Rehydrate and notify parent
-        const rehydratedLines = AnalysisParser.rehydrateBlock(block.lines, newWordNodes);
-        const newBlock = { ...block, lines: rehydratedLines };
+        // If no analysis provided, create a simple text-only block
+        if (newWordNodes.length === 0 && rawText.length > 0) {
+            // Split raw text by newlines and create simple line structure
+            // Preserve all lines including empty ones
+            const lines = [];
+            const textLines = rawText.split('\n');
+            textLines.forEach(textLine => {
+                // Keep all lines, even empty ones
+                lines.push({
+                    units: textLine.length > 0
+                        ? [{ type: 'text', original: textLine }]
+                        : []  // Empty line represented by empty units array
+                });
+            });
 
-        onUpdate(newBlock);
+            const newBlock = { ...block, lines: lines.length > 0 ? lines : [{ units: [{ type: 'text', original: rawText }] }] };
+            onUpdate(newBlock);
+        } else {
+            // Rehydrate and notify parent
+            const rehydratedLines = AnalysisParser.rehydrateBlock(block.lines, newWordNodes);
+            const newBlock = { ...block, lines: rehydratedLines };
+            onUpdate(newBlock);
+        }
     };
 
     // Auto-resize textarea
