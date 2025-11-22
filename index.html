@@ -162,7 +162,7 @@
 
             } catch (err) {
                 console.error("Error loading app:", err);
-                document.getElementById('root').innerHTML = `<div style="color:red; padding:20px;">Error: ${err.message}</div>`;
+                document.getElementById('root').innerHTML = `<div class="error-message">Error: ${err.message}</div>`;
             }
         }
 

@@ -177,10 +177,10 @@ body {
 }
 
 
-/* Note: .word-card-grid requires dynamic inline style (gridTemplateColumns)
-   to set the column count based on the number of sub-units */
+/* Note: .word-card-grid uses CSS variable --col-count for dynamic columns */
 .word-card-grid {
     display: inline-grid;
+    grid-template-columns: repeat(var(--col-count, 1), auto);
     column-gap: 0.125rem;
     /* gap-x-0.5 */
     vertical-align: baseline;
@@ -212,9 +212,15 @@ body {
 .main-analysis-box {
     text-align: center;
     margin-top: 0;
+    grid-column: 1 / span var(--col-count, 1);
     /* Removed max-width constraint */
     min-width: 60px;
     user-select: none;
+}
+
+.error-message {
+    color: red;
+    padding: 20px;
 }
 
 .main-analysis-underline {

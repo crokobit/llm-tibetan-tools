@@ -51,7 +51,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
         <span
             data-indices={indices ? JSON.stringify(indices) : undefined}
             className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''}`}
-            style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
+            style={{ '--col-count': subUnits.length }}
             // Clicking background selects the main unit
             onClick={(e) => {
                 const selection = window.getSelection();
@@ -132,7 +132,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
 
             {/* --- Row 2: Main Analysis (Spans all cols) --- */}
             <span
-                style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
+
                 className="main-analysis-box"
                 data-part="main-analysis"
                 onClick={(e) => {
