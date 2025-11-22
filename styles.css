@@ -798,8 +798,14 @@ body {
 .loading-text {
     text-align: center;
     color: #6b7280;
-    margin-top: 2.5rem;
 }
+
+/* Selection Highlight */
+.tibetan-word-box ::selection {
+    background-color: #bbf7d0;
+    /* bg-green-200 */
+}
+
 
 .empty-state {
     text-align: center;

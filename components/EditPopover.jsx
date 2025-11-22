@@ -168,7 +168,8 @@ const EditPopover = () => {
 
     useEffect(() => {
         if (isCreating) {
-            setFormData({ text: '', volls: '', root: '', definition: '' });
+            const selectedText = editingTarget?.creationDetails?.selectedText || '';
+            setFormData({ text: selectedText, volls: '', root: '', definition: '' });
             setStartNode([]);
             setStartAttrs({ hon: false, tense: [] });
             setOperator('single');
@@ -198,7 +199,7 @@ const EditPopover = () => {
             setEndNode(parsed.end);
             setEndAttrs(parsed.endAttrs);
         }
-    }, [data, isCreating, possibleParents]);
+    }, [data, isCreating, possibleParents, editingTarget]);
 
     // Smart Positioning
     React.useLayoutEffect(() => {

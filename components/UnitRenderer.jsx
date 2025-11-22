@@ -35,14 +35,6 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
                 0,
                 highlightColor
             );
-        } else if (isSelected) {
-            content = renderHighlightedText(
-                unit.original,
-                selectionRange[0],
-                selectionRange[1],
-                0,
-                'custom-selected' // We need to ensure this class works with renderHighlightedText logic or add it to styles
-            );
         }
 
         return (
