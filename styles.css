@@ -211,7 +211,7 @@ body {
     margin-top: 0;
     /* Removed max-width constraint */
     min-width: 60px;
-    /* user-select: none; - Removed to allow text selection */
+    user-select: none;
 }
 
 .main-analysis-underline {
@@ -241,7 +241,7 @@ body {
     width: 100%;
     border-radius: 0.25rem;
     transition: background-color 200ms;
-    /* user-select: none; - Removed to allow text selection */
+    user-select: none;
 }
 
 .sub-analysis-cell.analyzed {
