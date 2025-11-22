@@ -122,7 +122,6 @@ export function SelectionProvider({ children }) {
             [start, end] = [end, start];
         }
 
-        console.log('Selection Change:', { start, end });
         setSelectionRange({ start, end });
     }, []);
 
@@ -133,13 +132,15 @@ export function SelectionProvider({ children }) {
 
     // Handle MouseUp to trigger Analysis Creation
     useEffect(() => {
-        const handleMouseUp = () => {
+        const handleMouseUp = (e) => {
             if (copyMode) return; // Do nothing in Copy Mode
+
+            // Ignore clicks inside the edit popover
+            if (e.target.closest('.popover-container')) return;
+
             if (!selectionRange) return;
 
             const { start, end } = selectionRange;
-
-            console.log('Mouse Up Selection:', selectionRange);
 
             // Only trigger if selection is within the same unit (or sub-unit)
             // and actually selects something
@@ -151,7 +152,6 @@ export function SelectionProvider({ children }) {
                 // If selection is in analysis part, we should select the whole unit for editing
                 // instead of creating a new analysis on the analysis text
                 if (start.part === 'sub-analysis' || start.part === 'main-analysis') {
-                    console.log('Selection in analysis part, triggering edit for unit');
 
                     // Find the unit data
                     const block = documentData[start.blockIdx];
@@ -197,6 +197,8 @@ export function SelectionProvider({ children }) {
 
                     return;
                 }
+
+
                 const length = end.offset - start.offset;
                 if (length > 0) {
                     // Trigger creation!
@@ -233,22 +235,21 @@ export function SelectionProvider({ children }) {
 
                     const selectedText = originalText.substring(start.offset, end.offset);
 
-                    console.log('Selected Text for Creation:', selectedText);
-
                     // Determine if we are Creating new or Editing existing
                     let isCreating = true;
                     let targetUnit = unit;
+                    const isFullSelection = selectedText.length === originalText.length;
 
                     if (hasSubAnalysis && subUnits && start.subIndex !== undefined && start.subIndex !== null) {
                         // Real sub-unit
                         targetUnit = subUnits[start.subIndex];
-                        if (targetUnit.analysis) {
+                        if (targetUnit.analysis && isFullSelection) {
                             isCreating = false;
                         }
                     } else {
                         // Main unit (no sub-analysis structure, so subIndex 0 refers to main unit)
                         targetUnit = unit;
-                        if (unit.analysis) {
+                        if (unit.analysis && isFullSelection) {
                             isCreating = false;
                         }
                     }
@@ -266,7 +267,7 @@ export function SelectionProvider({ children }) {
                             blockIdx: start.blockIdx,
                             lineIdx: start.lineIdx,
                             unitIdx: start.unitIdx,
-                            subIndex: start.subIndex
+                            subIndex: hasSubAnalysis ? start.subIndex : null
                         },
                         isCreating: isCreating,
                         unit: targetUnit,
