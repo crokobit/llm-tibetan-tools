@@ -54,7 +54,6 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             style={{ gridTemplateColumns: `repeat(${subUnits.length}, auto)` }}
             // Clicking background selects the main unit
             onClick={(e) => {
-                console.log('WordCard Background Click', { unit, indices });
                 const selection = window.getSelection();
                 if (selection && !selection.isCollapsed) return;
                 e.stopPropagation();
@@ -99,9 +98,9 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                     <span
                         key={`tib-${i}`}
                         data-subindex={i}
+                        data-part="tibetan"
                         className={`tibetan-word-box ${i === hoveredSubIndex && !isAnyEditActive ? 'highlight-editing' : ''} ${isThisSubWordEditing ? 'highlight-editing' : ''}`}
                         onClick={(e) => {
-                            console.log('Tibetan Word Box Click', { i, u, hasSubAnalysis });
                             // If text is selected, do not trigger click
                             const selection = window.getSelection();
                             if (selection && !selection.isCollapsed) {
@@ -135,6 +134,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             <span
                 style={{ gridColumn: `1 / span ${subUnits.length}`, marginTop: 0 }}
                 className="main-analysis-box"
+                data-part="main-analysis"
                 onClick={(e) => {
                     const selection = window.getSelection();
                     if (selection && !selection.isCollapsed) return;
@@ -176,6 +176,8 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 return (
                     <span
                         key={`sub-${i}`}
+                        data-subindex={i}
+                        data-part="sub-analysis"
                         className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
                         onMouseEnter={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(i) : undefined}
                         onMouseLeave={isAnalyzed && !isAnyEditActive ? () => setHoveredSubIndex(null) : undefined}

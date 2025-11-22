@@ -12,7 +12,6 @@ export function SelectionProvider({ children }) {
 
     // Helper to calculate true offset relative to the unit container
     const getTrueOffset = (container, node, offset) => {
-        // console.log('getTrueOffset', { container, node, offset });
         if (node === container) {
             // If the node is the container itself, the offset is the child index
             // We need to sum lengths of all text in children before this index
@@ -47,7 +46,6 @@ export function SelectionProvider({ children }) {
             }
             current = current.parentElement;
         }
-        // console.log('getTrueOffset result:', total);
         return total;
     };
 
@@ -64,9 +62,11 @@ export function SelectionProvider({ children }) {
         // Check for sub-index
         const subNode = node.nodeType === 3 ? node.parentElement.closest('[data-subindex]') : node.closest('[data-subindex]');
         let trueOffset = 0;
+        let part = 'tibetan'; // Default to tibetan
 
         if (subNode) {
             indices.subIndex = parseInt(subNode.dataset.subindex, 10);
+            part = subNode.dataset.part || 'tibetan';
             trueOffset = getTrueOffset(subNode, node, offset);
         } else {
             // For main unit (no sub-index), calculate offset relative to the unit container
@@ -74,10 +74,15 @@ export function SelectionProvider({ children }) {
             // The container has data-indices.
             // The text is inside.
             trueOffset = getTrueOffset(unitNode, node, offset);
+
+            // Check if we are in main analysis
+            const mainAnalysisNode = node.nodeType === 3 ? node.parentElement.closest('[data-part="main-analysis"]') : node.closest('[data-part="main-analysis"]');
+            if (mainAnalysisNode) {
+                part = 'main-analysis';
+            }
         }
 
-        console.log('getIndicesFromNode', { node, offset, indices, trueOffset });
-        return { ...indices, offset: trueOffset };
+        return { ...indices, offset: trueOffset, part };
     };
 
     // Handle selection change
@@ -89,17 +94,9 @@ export function SelectionProvider({ children }) {
         }
 
         const range = selection.getRangeAt(0);
-        console.log('Raw Selection:', {
-            startContainer: range.startContainer,
-            startOffset: range.startOffset,
-            endContainer: range.endContainer,
-            endOffset: range.endOffset
-        });
 
         const startData = getIndicesFromNode(range.startContainer, range.startOffset);
         const endData = getIndicesFromNode(range.endContainer, range.endOffset);
-
-        console.log('Parsed Selection Data:', { startData, endData });
 
         if (!startData || !endData) {
             setSelectionRange(null);
@@ -125,6 +122,7 @@ export function SelectionProvider({ children }) {
             [start, end] = [end, start];
         }
 
+        console.log('Selection Change:', { start, end });
         setSelectionRange({ start, end });
     }, []);
 
@@ -140,7 +138,8 @@ export function SelectionProvider({ children }) {
             if (!selectionRange) return;
 
             const { start, end } = selectionRange;
-            console.log('handleMouseUp', { start, end });
+
+            console.log('Mouse Up Selection:', selectionRange);
 
             // Only trigger if selection is within the same unit (or sub-unit)
             // and actually selects something
@@ -149,6 +148,55 @@ export function SelectionProvider({ children }) {
                 start.unitIdx === end.unitIdx &&
                 start.subIndex === end.subIndex) {
 
+                // If selection is in analysis part, we should select the whole unit for editing
+                // instead of creating a new analysis on the analysis text
+                if (start.part === 'sub-analysis' || start.part === 'main-analysis') {
+                    console.log('Selection in analysis part, triggering edit for unit');
+
+                    // Find the unit data
+                    const block = documentData[start.blockIdx];
+                    const line = block.lines[start.lineIdx];
+                    const unit = line.units[start.unitIdx];
+
+                    let subUnits = null;
+                    // Check for sub-analysis structure
+                    const hasSubAnalysis = (unit.nestedData && unit.nestedData.length > 0) || (unit.supplementaryData && unit.supplementaryData.length > 0);
+
+                    if (start.subIndex !== undefined && start.subIndex !== null) {
+                        subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
+                    }
+
+                    // If we are in a sub-analysis box, we want to edit that sub-unit
+                    // If we are in main analysis box, we want to edit the main unit
+
+                    let targetUnit = unit;
+                    if (subUnits && start.subIndex !== undefined && start.subIndex !== null) {
+                        targetUnit = subUnits[start.subIndex];
+                    }
+
+                    // Set Anchor Rect for Popup
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        setAnchorRect(rect);
+                    }
+
+                    setEditingTarget({
+                        indices: {
+                            blockIdx: start.blockIdx,
+                            lineIdx: start.lineIdx,
+                            unitIdx: start.unitIdx,
+                            subIndex: start.subIndex
+                        },
+                        isCreating: false, // Always editing if selecting analysis
+                        unit: targetUnit,
+                        creationDetails: null, // No creation details needed for editing
+                        highlightColor: 'highlight-editing'
+                    });
+
+                    return;
+                }
                 const length = end.offset - start.offset;
                 if (length > 0) {
                     // Trigger creation!
@@ -179,19 +227,20 @@ export function SelectionProvider({ children }) {
                     if (start.subIndex !== undefined && start.subIndex !== null) {
                         // It's a sub-unit. We need to find it.
                         subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
-                        if (!subUnits) subUnits = [{ original: unit.original }];
+                        if (!subUnits) subUnits = [{ original: unit.original, analysis: null }];
                         originalText = subUnits[start.subIndex].original;
                     }
 
                     const selectedText = originalText.substring(start.offset, end.offset);
-                    console.log('Selected Text for Analysis:', selectedText);
+
+                    console.log('Selected Text for Creation:', selectedText);
 
                     // Determine if we are Creating new or Editing existing
                     let isCreating = true;
-                    if (hasSubAnalysis) {
-                        // If we have sub-analysis, and we selected the ENTIRE text of a sub-unit,
-                        // assume we want to EDIT that existing sub-analysis.
-                        if (start.offset === 0 && end.offset === originalText.length) {
+                    let targetUnit = unit;
+                    if (subUnits && subUnits[start.subIndex]) {
+                        targetUnit = subUnits[start.subIndex];
+                        if (targetUnit.analysis) {
                             isCreating = false;
                         }
                     }
@@ -212,6 +261,7 @@ export function SelectionProvider({ children }) {
                             subIndex: start.subIndex
                         },
                         isCreating: isCreating,
+                        unit: targetUnit,
                         creationDetails: {
                             startOffset: start.offset,
                             selectedText: selectedText
@@ -223,8 +273,6 @@ export function SelectionProvider({ children }) {
                     // window.getSelection().removeAllRanges();
                     // setSelectionRange(null);
                 }
-            } else {
-                console.log('Selection spans multiple units or is invalid for analysis creation');
             }
         };
 
