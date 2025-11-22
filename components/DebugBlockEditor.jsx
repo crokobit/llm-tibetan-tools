@@ -136,20 +136,6 @@ export default function DebugBlockEditor({ block, onUpdate }) {
         <textarea
             ref={textareaRef}
             className="block-debug-output"
-            style={{
-                marginTop: '1rem',
-                padding: '1rem',
-                backgroundColor: '#f9fafb',
-                border: '1px solid #e5e7eb',
-                borderRadius: '0.375rem',
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                fontSize: '0.875rem',
-                color: '#374151',
-                width: '100%',
-                minHeight: '150px',
-                resize: 'none', // Disable manual resize as we handle it automatically
-                overflow: 'hidden' // Hide scrollbar
-            }}
             value={text}
             onChange={handleChange}
         />
