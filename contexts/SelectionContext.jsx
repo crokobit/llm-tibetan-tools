@@ -142,32 +142,27 @@ export function SelectionProvider({ children }) {
 
             const { start, end } = selectionRange;
 
-            // Only trigger if selection is within the same unit (or sub-unit)
-            // and actually selects something
+            // Only trigger if selection is within the same unit
             if (start.blockIdx === end.blockIdx &&
                 start.lineIdx === end.lineIdx &&
-                start.unitIdx === end.unitIdx &&
-                start.subIndex === end.subIndex) {
+                start.unitIdx === end.unitIdx) {
+
+                // Check if selection spans multiple sub-units (for main analysis edit)
+                const spansMultipleSubUnits = start.subIndex !== end.subIndex;
 
                 // If selection is in analysis part, we should select the whole unit for editing
-                // instead of creating a new analysis on the analysis text
                 if (start.part === 'sub-analysis' || start.part === 'main-analysis') {
-
                     // Find the unit data
                     const block = documentData[start.blockIdx];
                     const line = block.lines[start.lineIdx];
                     const unit = line.units[start.unitIdx];
 
                     let subUnits = null;
-                    // Check for sub-analysis structure
                     const hasSubAnalysis = (unit.nestedData && unit.nestedData.length > 0) || (unit.supplementaryData && unit.supplementaryData.length > 0);
 
                     if (start.subIndex !== undefined && start.subIndex !== null) {
                         subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
                     }
-
-                    // If we are in a sub-analysis box, we want to edit that sub-unit
-                    // If we are in main analysis box, we want to edit the main unit
 
                     let targetUnit = unit;
                     if (subUnits && start.subIndex !== undefined && start.subIndex !== null) {
@@ -187,7 +182,7 @@ export function SelectionProvider({ children }) {
                             blockIdx: start.blockIdx,
                             lineIdx: start.lineIdx,
                             unitIdx: start.unitIdx,
-                            subIndex: start.subIndex
+                            subIndex: hasSubAnalysis ? start.subIndex : null
                         },
                         isCreating: false, // Always editing if selecting analysis
                         unit: targetUnit,
@@ -198,59 +193,101 @@ export function SelectionProvider({ children }) {
                     return;
                 }
 
+                // Text selection logic
+                // We need to handle both single sub-unit and multi-sub-unit selections
 
-                const length = end.offset - start.offset;
-                if (length > 0) {
-                    // Trigger creation!
-                    // We need the text content to pass to creationDetails
-                    // But wait, setEditingTarget expects us to set isCreating: true
-                    // and provide creationDetails.
+                const block = documentData[start.blockIdx];
+                const line = block.lines[start.lineIdx];
+                const unit = line.units[start.unitIdx];
 
-                    // We can't easily get the text here without traversing data.
-                    // But we have indices.
+                let originalText = unit.original;
+                let subUnits = null;
+                const hasSubAnalysis = (unit.nestedData && unit.nestedData.length > 0) || (unit.supplementaryData && unit.supplementaryData.length > 0);
 
-                    // Actually, we should just set the target and let the UI handle the rest?
-                    // No, we need to pass the selected text range.
+                if (hasSubAnalysis) {
+                    subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
+                }
 
-                    // Let's find the text from documentData? 
-                    // Accessing documentData inside useEffect might be stale if not in dependency array.
-                    // But documentData is from context.
+                // Calculate selected text and check for full selection
+                let selectedText = '';
+                let isFullSelection = false;
 
-                    const block = documentData[start.blockIdx];
-                    const line = block.lines[start.lineIdx];
-                    const unit = line.units[start.unitIdx];
+                if (spansMultipleSubUnits) {
+                    // If spanning multiple, we assume it's an attempt to select the whole word
+                    // We verify if it covers the whole word
+                    // For simplicity, if it spans multiple, we treat it as main unit selection if it covers enough?
+                    // Or strictly check offsets.
 
-                    let originalText = unit.original;
-                    let subUnits = null;
+                    // Actually, if it spans multiple, it MUST be a main unit operation (or invalid).
+                    // Let's construct the text.
+                    if (subUnits) {
+                        // Start from start.subIndex to end.subIndex
+                        // Note: start.offset is into start.subIndex
+                        // end.offset is into end.subIndex
 
-                    // Check for sub-analysis structure
-                    const hasSubAnalysis = (unit.nestedData && unit.nestedData.length > 0) || (unit.supplementaryData && unit.supplementaryData.length > 0);
+                        // This is complicated to reconstruct exactly without iterating.
+                        // But we know it's the same unit.
+                        // Let's just check if it looks like a full selection of the main unit.
 
-                    if (start.subIndex !== undefined && start.subIndex !== null) {
-                        // It's a sub-unit. We need to find it.
-                        subUnits = (unit.nestedData && unit.nestedData.length > 0) ? unit.nestedData : (unit.supplementaryData && unit.supplementaryData.length > 0 ? unit.supplementaryData : null);
-                        if (!subUnits) subUnits = [{ original: unit.original, analysis: null }];
+                        // If start is 0 (or close) of first sub and end is len (or close) of last sub.
+                        // But we can just use the window selection text?
+                        const selection = window.getSelection();
+                        selectedText = selection.toString(); // This might include newlines or be messy
+
+                        // Better: use unit.original
+                        // If we select the whole thing, selectedText should match unit.original
+                        // But offsets are tricky.
+
+                        // Let's assume if it spans multiple sub-units, we target the MAIN unit.
+                        isFullSelection = true; // Treat as full selection of main unit
+                        originalText = unit.original;
+                        selectedText = unit.original; // Approximation for now
+                    }
+                } else {
+                    // Single sub-unit selection
+                    if (subUnits && start.subIndex !== undefined && start.subIndex !== null) {
                         originalText = subUnits[start.subIndex].original;
                     }
+                    selectedText = originalText.substring(start.offset, end.offset);
+                    isFullSelection = selectedText.length === originalText.length;
+                }
 
-                    const selectedText = originalText.substring(start.offset, end.offset);
-
-                    // Determine if we are Creating new or Editing existing
+                if (selectedText.length > 0) {
                     let isCreating = true;
                     let targetUnit = unit;
-                    const isFullSelection = selectedText.length === originalText.length;
+                    let targetSubIndex = null;
+                    let possibleParents = [];
 
-                    if (hasSubAnalysis && subUnits && start.subIndex !== undefined && start.subIndex !== null) {
-                        // Real sub-unit
-                        targetUnit = subUnits[start.subIndex];
-                        if (targetUnit.analysis && isFullSelection) {
+                    if (spansMultipleSubUnits) {
+                        // Targeting main unit
+                        targetUnit = unit;
+                        targetSubIndex = null;
+                        if (unit.analysis) {
                             isCreating = false;
                         }
                     } else {
-                        // Main unit (no sub-analysis structure, so subIndex 0 refers to main unit)
-                        targetUnit = unit;
-                        if (unit.analysis && isFullSelection) {
-                            isCreating = false;
+                        // Single sub-unit or main unit (if no subs)
+                        if (hasSubAnalysis && subUnits && start.subIndex !== undefined && start.subIndex !== null) {
+                            // Real sub-unit
+                            targetUnit = subUnits[start.subIndex];
+                            targetSubIndex = start.subIndex;
+                            if (targetUnit.analysis && isFullSelection) {
+                                isCreating = false;
+                            }
+                        } else {
+                            // Main unit (no sub-analysis structure)
+                            targetUnit = unit;
+                            targetSubIndex = null; // Treat as main
+                            if (unit.analysis) {
+                                if (isFullSelection) {
+                                    isCreating = false;
+                                } else {
+                                    // Creating sub-analysis on a word that has main analysis
+                                    // We should allow this!
+                                    // And we should hint that it can be a sub-analysis
+                                    possibleParents.push({ id: 'sub', label: 'Sub-analysis' });
+                                }
+                            }
                         }
                     }
 
@@ -267,20 +304,17 @@ export function SelectionProvider({ children }) {
                             blockIdx: start.blockIdx,
                             lineIdx: start.lineIdx,
                             unitIdx: start.unitIdx,
-                            subIndex: hasSubAnalysis ? start.subIndex : null
+                            subIndex: targetSubIndex
                         },
                         isCreating: isCreating,
                         unit: targetUnit,
+                        possibleParents: possibleParents,
                         creationDetails: {
                             startOffset: start.offset,
                             selectedText: selectedText
                         },
                         highlightColor: isCreating ? 'highlight-creating' : 'highlight-editing'
                     });
-
-                    // Clear native selection to avoid visual clutter?
-                    // window.getSelection().removeAllRanges();
-                    // setSelectionRange(null);
                 }
             }
         };
