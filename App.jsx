@@ -92,7 +92,6 @@ function TibetanReaderContent() {
                 {/* Header */}
                 <div className="app-header">
                     <h1 className="app-header-title">Tibetan Text Analyzer</h1>
-                    <p className="app-header-subtitle">Upload a .docx file or paste text to begin analysis</p>
                 </div>
 
                 {/* Toolbar */}
@@ -103,30 +102,34 @@ function TibetanReaderContent() {
                         onChange={handleFileUpload}
                         className="file-input-custom"
                     />
-                    <button
-                        onClick={downloadOutput}
-                        className="btn-export"
-                    >
-                        Export Text
-                    </button>
-                    <div className="toolbar-controls-container">
-                        <label className="debug-mode-label">
-                            <input
-                                type="checkbox"
-                                checked={selectMode}
-                                onChange={(e) => setSelectMode(e.target.checked)}
-                            />
-                            Select Mode
-                        </label>
-                        <label className="debug-mode-label">
-                            <input
-                                type="checkbox"
-                                checked={showDebug}
-                                onChange={(e) => setShowDebug(e.target.checked)}
-                            />
-                            Debug Mode
-                        </label>
-                    </div>
+                    {documentData.length > 0 && (
+                        <>
+                            <button
+                                onClick={downloadOutput}
+                                className="btn-export"
+                            >
+                                Export Text
+                            </button>
+                            <div className="toolbar-controls-container">
+                                <label className="debug-mode-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectMode}
+                                        onChange={(e) => setSelectMode(e.target.checked)}
+                                    />
+                                    Select Mode
+                                </label>
+                                <label className="debug-mode-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={showDebug}
+                                        onChange={(e) => setShowDebug(e.target.checked)}
+                                    />
+                                    Debug Mode
+                                </label>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Content Area */}
@@ -139,9 +142,7 @@ function TibetanReaderContent() {
                         <>
                             {documentData.length === 0 && (
                                 <div className="empty-state">
-                                    <p>No content yet. Add a block to get started!</p>
-                                    <button onClick={() => insertRichTextBlock(-1)} className="btn-insert">+ Rich Text</button>
-                                    <button onClick={() => insertTibetanBlock(-1)} className="btn-insert">+ Tibetan</button>
+                                    {/* Empty state content removed as requested */}
                                 </div>
                             )}
                             {documentData.map((block, blockIdx) => (
