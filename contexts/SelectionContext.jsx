@@ -8,7 +8,7 @@ export function SelectionProvider({ children }) {
     const { documentData } = useDocument();
     const { setEditingTarget, setAnchorRect } = useEdit(); // Need this to trigger analysis creation
     const [selectionRange, setSelectionRange] = useState(null);
-    const [copyMode, setCopyMode] = useState(false);
+    const [selectMode, setSelectMode] = useState(false);
 
     // Helper to calculate true offset relative to the unit container
     const getTrueOffset = (container, node, offset) => {
@@ -133,7 +133,7 @@ export function SelectionProvider({ children }) {
     // Handle MouseUp to trigger Analysis Creation
     useEffect(() => {
         const handleMouseUp = (e) => {
-            if (copyMode) return; // Do nothing in Copy Mode
+            if (selectMode) return; // Do nothing in Select Mode
 
             // Ignore clicks inside the edit popover
             if (e.target.closest('.popover-container')) return;
@@ -288,7 +288,7 @@ export function SelectionProvider({ children }) {
 
         document.addEventListener('mouseup', handleMouseUp);
         return () => document.removeEventListener('mouseup', handleMouseUp);
-    }, [selectionRange, copyMode, documentData, setEditingTarget, setAnchorRect]);
+    }, [selectionRange, selectMode, documentData, setEditingTarget, setAnchorRect]);
 
     // Helper to determine if a unit/sub-unit is selected and get the highlight range
     const getHighlightRange = useCallback((indices, subIndex = null, textLength) => {
@@ -406,8 +406,8 @@ export function SelectionProvider({ children }) {
     const value = {
         selectionRange,
         getHighlightRange,
-        copyMode,
-        setCopyMode
+        selectMode,
+        setSelectMode
     };
 
     return (

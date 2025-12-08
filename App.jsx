@@ -9,7 +9,7 @@ import TibetanBlock from './components/TibetanBlock.jsx';
 function TibetanReaderContent() {
     const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
-    const { copyMode, setCopyMode } = useSelection();
+    const { selectMode, setSelectMode } = useSelection();
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
@@ -113,10 +113,10 @@ function TibetanReaderContent() {
                         <label className="debug-mode-label">
                             <input
                                 type="checkbox"
-                                checked={copyMode}
-                                onChange={(e) => setCopyMode(e.target.checked)}
+                                checked={selectMode}
+                                onChange={(e) => setSelectMode(e.target.checked)}
                             />
-                            Copy Mode
+                            Select Mode
                         </label>
                         <label className="debug-mode-label">
                             <input
