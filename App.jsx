@@ -40,7 +40,8 @@ function TibetanReaderContent() {
                 output += '>>>\n';
                 // Reconstruct raw text
                 let rawText = '';
-                block.lines.forEach(line => {
+                block.lines.forEach((line, idx) => {
+                    if (idx > 0) rawText += '\n';
                     line.units.forEach(u => rawText += u.original);
                 });
                 output += rawText + '\n';

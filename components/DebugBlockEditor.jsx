@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AnalysisParser from '../logic/AnalysisParser.js';
+import DocumentParser from '../logic/DocumentParser.js';
 
 export default function DebugBlockEditor({ block, onUpdate }) {
     const [text, setText] = useState(() => generateDebugText(block));
@@ -97,31 +98,13 @@ export default function DebugBlockEditor({ block, onUpdate }) {
         analysisPart = analysisPart.split('>>>>>')[0];
 
         const debugText = analysisPart.trim();
-        const newWordNodes = AnalysisParser.parseDebugText(debugText);
 
-        // If no analysis provided, create a simple text-only block
-        if (newWordNodes.length === 0 && rawText.length > 0) {
-            // Split raw text by newlines and create simple line structure
-            // Preserve all lines including empty ones
-            const lines = [];
-            const textLines = rawText.split('\n');
-            textLines.forEach(textLine => {
-                // Keep all lines, even empty ones
-                lines.push({
-                    units: textLine.length > 0
-                        ? [{ type: 'text', original: textLine }]
-                        : []  // Empty line represented by empty units array
-                });
-            });
+        // Use DocumentParser to process the block, which handles merging analysis with raw text
+        // This ensures that if the user edits the raw text, it is respected
+        const processedBlock = DocumentParser._processBlock(rawText, debugText);
 
-            const newBlock = { ...block, lines: lines.length > 0 ? lines : [{ units: [{ type: 'text', original: rawText }] }] };
-            onUpdate(newBlock);
-        } else {
-            // Rehydrate and notify parent
-            const rehydratedLines = AnalysisParser.rehydrateBlock(block.lines, newWordNodes);
-            const newBlock = { ...block, lines: rehydratedLines };
-            onUpdate(newBlock);
-        }
+        const newBlock = { ...block, lines: processedBlock.lines };
+        onUpdate(newBlock);
     };
 
     // Auto-resize textarea
