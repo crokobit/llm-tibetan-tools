@@ -11,17 +11,26 @@ export default function DebugBlockEditor({ block, onUpdate }) {
 
     // Helper to generate the full debug text
     function generateDebugText(blk) {
-        let output = '>>>\n';
-        let rawText = '';
-        blk.lines.forEach((line, idx) => {
-            if (idx > 0) rawText += '\n'; // Add newline between lines
-            line.units.forEach(u => rawText += u.original);
-        });
-        output += rawText + '\n';
-        output += '>>>>\n';
-        output += AnalysisParser.format(blk.lines);
-        output += '>>>>>';
-        return output;
+        try {
+            let output = '>>>\n';
+            let rawText = '';
+            if (!blk || !blk.lines) {
+                throw new Error('Invalid block data: missing lines');
+            }
+            blk.lines.forEach((line, idx) => {
+                if (idx > 0) rawText += '\n'; // Add newline between lines
+                if (line.units) {
+                    line.units.forEach(u => rawText += u.original);
+                }
+            });
+            output += rawText + '\n';
+            output += '>>>>\n';
+            output += AnalysisParser.format(blk.lines);
+            output += '>>>>>';
+            return output;
+        } catch (e) {
+            return `ERROR GENERATING DEBUG TEXT:\n${e.message}\n\nStack:\n${e.stack}`;
+        }
     }
 
     // Sync text from block when block changes externally
@@ -30,12 +39,10 @@ export default function DebugBlockEditor({ block, onUpdate }) {
 
         // Only update if block content actually changed AND we're not actively typing
         if (currentSerial !== blockSerialRef.current && !isTypingRef.current) {
-            console.log('[DebugBlockEditor] Updating text from block change');
             setText(generateDebugText(block));
             blockSerialRef.current = currentSerial;
         } else if (currentSerial !== blockSerialRef.current) {
             // Block changed but we're typing - just update the serial for next time
-            console.log('[DebugBlockEditor] Block changed but typing, deferring update');
             blockSerialRef.current = currentSerial;
         }
     }, [block]);

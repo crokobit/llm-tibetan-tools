@@ -145,7 +145,7 @@ function TibetanReaderContent() {
                                 </div>
                             )}
                             {documentData.map((block, blockIdx) => (
-                                <div key={blockIdx}>
+                                <div key={blockIdx} className="block-wrapper">
                                     {/* Render block based on type */}
                                     {block.type === 'richtext' ? (
                                         <RichTextBlock

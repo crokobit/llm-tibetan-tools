@@ -1222,8 +1222,8 @@ body {
 }
 
 /* Block Layout */
-.block-layout {
-    position: relative;
+/* Block Layout */
+.block-wrapper {
     margin-bottom: 3rem;
     /* mb-12 */
     padding-bottom: 2rem;
@@ -1232,9 +1232,14 @@ body {
     /* border-gray-200 */
 }
 
-.block-layout:last-child {
+.block-wrapper:last-child {
     border-bottom: none;
     /* last:border-0 */
+}
+
+.block-layout {
+    position: relative;
+    /* Removed border and spacing as they are now in .block-wrapper */
 }
 
 /* Rich Text Block Styles */
