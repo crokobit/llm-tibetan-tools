@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { AppProviders, useDocument, useEdit, useSelection } from './contexts/index.jsx';
 import AnalysisParser from './logic/AnalysisParser.js';
-import LineRenderer from './components/LineRenderer.jsx';
 import EditPopover from './components/EditPopover.jsx';
 import RichTextBlock from './components/RichTextBlock.jsx';
-
-import DebugBlockEditor from './components/DebugBlockEditor.jsx';
+import TibetanBlock from './components/TibetanBlock.jsx';
 
 // Internal component that uses contexts
 function TibetanReaderContent() {
@@ -65,6 +63,15 @@ function TibetanReaderContent() {
         setDocumentData(prev => {
             const newData = [...prev];
             newData[blockIdx] = newBlock;
+            return newData;
+        });
+    };
+
+    const toggleBlockDebug = (blockIdx) => {
+        setDocumentData(prev => {
+            const newData = [...prev];
+            const block = newData[blockIdx];
+            newData[blockIdx] = { ...block, _showDebug: !block._showDebug };
             return newData;
         });
     };
@@ -148,30 +155,28 @@ function TibetanReaderContent() {
                                             blockIdx={blockIdx}
                                         />
                                     ) : (
-                                        <div className="block-layout">
-                                            {block.lines.map((line, lineIdx) => (
-                                                <LineRenderer
-                                                    key={lineIdx}
-                                                    line={line}
-                                                    blockIdx={blockIdx}
-                                                    lineIdx={lineIdx}
-                                                    editingTarget={editingTarget}
-                                                    isAnyEditActive={!!editingTarget}
-                                                />
-                                            ))}
-                                            {showDebug && (
-                                                <DebugBlockEditor
-                                                    block={block}
-                                                    onUpdate={(newBlock) => handleBlockUpdate(blockIdx, newBlock)}
-                                                />
-                                            )}
-                                        </div>
+                                        <TibetanBlock
+                                            block={block}
+                                            blockIdx={blockIdx}
+                                            onUpdate={handleBlockUpdate}
+                                            editingTarget={editingTarget}
+                                            showDebug={showDebug || block._showDebug}
+                                        />
                                     )}
 
                                     {/* Insert buttons after each block */}
                                     <div className="block-insert-controls">
                                         <button onClick={() => insertRichTextBlock(blockIdx)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
                                         <button onClick={() => insertTibetanBlock(blockIdx)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
+                                        {block.type === 'tibetan' && (
+                                            <button
+                                                onClick={() => toggleBlockDebug(blockIdx)}
+                                                className={`btn-insert-small ${block._showDebug ? 'bg-blue-50 text-blue-600 border-blue-200' : ''}`}
+                                                title="Toggle Debug View"
+                                            >
+                                                {block._showDebug ? 'Hide Debug' : 'Debug'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
