@@ -45,7 +45,7 @@ function TibetanReaderContent() {
                 });
                 output += rawText + '\n';
                 // Analysis
-                output += AnalysisParser.format(block.lines) + '\n';
+                output += '>>>>\n' + AnalysisParser.format(block.lines) + '\n>>>>>';
             }
         });
         return output;
