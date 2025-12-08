@@ -30,7 +30,7 @@ const PosSelect = ({ value, onChange }) => {
     const selectedBg = selectedOption.color.replace('pos-border-', 'pos-bg-');
 
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="pos-select-wrapper" ref={dropdownRef}>
             <button
                 type="button"
                 onClick={(e) => {
@@ -39,8 +39,8 @@ const PosSelect = ({ value, onChange }) => {
                 }}
                 className="form-select-button"
             >
-                <span className="text-sm">{selectedOption.label}</span>
-                <div className={`w-3 h-3 rounded-full ${selectedBg}`}></div>
+                <span className="pos-select-label">{selectedOption.label}</span>
+                <div className={`pos-color-dot ${selectedBg}`}></div>
             </button>
 
             {isOpen && (
@@ -57,8 +57,8 @@ const PosSelect = ({ value, onChange }) => {
                                 }}
                                 className="form-select-option"
                             >
-                                <div className="text-sm">{opt.label}</div>
-                                <div className={`w-3 h-3 rounded-full ${barColor}`}></div>
+                                <div className="pos-select-label">{opt.label}</div>
+                                <div className={`pos-color-dot ${barColor}`}></div>
                             </div>
                         );
                     })}

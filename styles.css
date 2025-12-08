@@ -811,6 +811,32 @@ body {
     cursor: pointer;
 }
 
+/* Semantic Refactoring Classes */
+.tibetan-unit-container {
+    display: inline-block;
+    margin-left: 0.125rem;
+    margin-right: 0.125rem;
+    cursor: text;
+}
+
+.pos-select-wrapper {
+    position: relative;
+}
+
+.pos-select-label {
+    font-size: 0.875rem;
+    /* text-sm */
+}
+
+.pos-color-dot {
+    width: 0.75rem;
+    /* w-3 */
+    height: 0.75rem;
+    /* h-3 */
+    border-radius: 9999px;
+    /* rounded-full */
+}
+
 .btn-copy:hover {
     background-color: #4b5563;
     /* hover:bg-gray-600 */
@@ -1197,6 +1223,7 @@ body {
 
 /* Block Layout */
 .block-layout {
+    position: relative;
     margin-bottom: 3rem;
     /* mb-12 */
     padding-bottom: 2rem;

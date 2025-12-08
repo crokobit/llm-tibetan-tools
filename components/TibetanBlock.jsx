@@ -4,7 +4,7 @@ import DebugBlockEditor from './DebugBlockEditor.jsx';
 
 export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug }) {
     return (
-        <div className="block-layout relative group">
+        <div className="block-layout">
 
             {block.lines.map((line, lineIdx) => (
                 <LineRenderer
