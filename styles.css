@@ -585,6 +585,159 @@ body {
     box-shadow: 0 0 0 1px #c7d2fe;
 }
 
+/* POS Button Specific Colors */
+/* Noun - Red */
+.pos-button-n {
+    color: #ef4444;
+    border-color: #fca5a5;
+    background-color: #fef2f2;
+}
+
+.pos-button-n:hover {
+    border-color: #ef4444;
+    background-color: #fee2e2;
+}
+
+.pos-button-n.selected {
+    background-color: #ef4444;
+    border-color: #ef4444;
+    color: white;
+    box-shadow: 0 0 0 1px #fca5a5;
+}
+
+/* Verb - Blue */
+.pos-button-v {
+    color: #3b82f6;
+    border-color: #93c5fd;
+    background-color: #eff6ff;
+}
+
+.pos-button-v:hover {
+    border-color: #3b82f6;
+    background-color: #dbeafe;
+}
+
+.pos-button-v.selected {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+    box-shadow: 0 0 0 1px #93c5fd;
+}
+
+/* Adjective - Green */
+.pos-button-adj {
+    color: #22c55e;
+    border-color: #86efac;
+    background-color: #f0fdf4;
+}
+
+.pos-button-adj:hover {
+    border-color: #22c55e;
+    background-color: #dcfce7;
+}
+
+.pos-button-adj.selected {
+    background-color: #22c55e;
+    border-color: #22c55e;
+    color: white;
+    box-shadow: 0 0 0 1px #86efac;
+}
+
+/* Adverb - Purple */
+.pos-button-adv {
+    color: #a855f7;
+    border-color: #d8b4fe;
+    background-color: #faf5ff;
+}
+
+.pos-button-adv:hover {
+    border-color: #a855f7;
+    background-color: #f3e8ff;
+}
+
+.pos-button-adv.selected {
+    background-color: #a855f7;
+    border-color: #a855f7;
+    color: white;
+    box-shadow: 0 0 0 1px #d8b4fe;
+}
+
+/* Other - Gray */
+.pos-button-other {
+    color: #6b7280;
+    border-color: #d1d5db;
+    background-color: #f9fafb;
+}
+
+.pos-button-other:hover {
+    border-color: #6b7280;
+    background-color: #f3f4f6;
+}
+
+.pos-button-other.selected {
+    background-color: #6b7280;
+    border-color: #6b7280;
+    color: white;
+    box-shadow: 0 0 0 1px #d1d5db;
+}
+
+/* Particle - Gray (Same as other for now, or maybe different?) */
+.pos-button-part {
+    color: #6b7280;
+    border-color: #d1d5db;
+    background-color: #f9fafb;
+}
+
+.pos-button-part:hover {
+    border-color: #6b7280;
+    background-color: #f3f4f6;
+}
+
+.pos-button-part.selected {
+    background-color: #6b7280;
+    border-color: #6b7280;
+    color: white;
+    box-shadow: 0 0 0 1px #d1d5db;
+}
+
+/* VD - Orange */
+.pos-button-vd {
+    color: #f97316;
+    border-color: #fdba74;
+    background-color: #fff7ed;
+}
+
+.pos-button-vd:hover {
+    border-color: #f97316;
+    background-color: #ffedd5;
+}
+
+.pos-button-vd.selected {
+    background-color: #f97316;
+    border-color: #f97316;
+    color: white;
+    box-shadow: 0 0 0 1px #fdba74;
+}
+
+/* VND - Pink */
+.pos-button-vnd {
+    color: #ec4899;
+    border-color: #f9a8d4;
+    background-color: #fdf2f8;
+}
+
+.pos-button-vnd:hover {
+    border-color: #ec4899;
+    background-color: #fce7f3;
+}
+
+.pos-button-vnd.selected {
+    background-color: #ec4899;
+    border-color: #ec4899;
+    color: white;
+    box-shadow: 0 0 0 1px #f9a8d4;
+}
+
 .operator-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

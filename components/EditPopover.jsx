@@ -372,7 +372,7 @@ const EditPopover = () => {
         <button
             onClick={() => !disabled && onClick(type.id)}
             disabled={disabled}
-            className={`pos-button ${selected ? 'selected' : ''}`}
+            className={`pos-button pos-button-${type.id} ${selected ? 'selected' : ''}`}
         >
             {type.label}
         </button>
