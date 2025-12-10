@@ -17,6 +17,9 @@ function TibetanReaderContent() {
     const [userFiles, setUserFiles] = useState([]);
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [saveFilename, setSaveFilename] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+    const [isLoadingFile, setIsLoadingFile] = useState(false);
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
@@ -68,6 +71,7 @@ function TibetanReaderContent() {
 
     const handleSaveCloud = async () => {
         if (!saveFilename) return;
+        setIsSaving(true);
         try {
             const content = JSON.stringify(documentData);
             await saveFile(token, saveFilename, content);
@@ -91,10 +95,13 @@ function TibetanReaderContent() {
             } else {
                 alert('Failed to save file.');
             }
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleOpenCloud = async () => {
+        setIsLoadingFiles(true);
         try {
             const files = await listFiles(token);
             setUserFiles(files);
@@ -115,10 +122,13 @@ function TibetanReaderContent() {
             } else {
                 alert('Failed to list files.');
             }
+        } finally {
+            setIsLoadingFiles(false);
         }
     };
 
     const loadFile = async (filename) => {
+        setIsLoadingFile(true);
         try {
             const response = await getFile(token, filename);
             // Expecting response to be { content: "stringified_json" }
@@ -148,6 +158,8 @@ function TibetanReaderContent() {
             } else {
                 alert('Failed to load file.');
             }
+        } finally {
+            setIsLoadingFile(false);
         }
     };
 
@@ -215,7 +227,9 @@ function TibetanReaderContent() {
                             {user && (
                                 <>
                                     <button onClick={() => setShowSaveDialog(true)} className="btn-export">Save to Cloud</button>
-                                    <button onClick={handleOpenCloud} className="btn-export">Open from Cloud</button>
+                                    <button onClick={handleOpenCloud} disabled={isLoadingFiles} className="btn-export">
+                                        {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
+                                    </button>
                                 </>
                             )}
                             <div className="toolbar-controls-container">
@@ -310,8 +324,10 @@ function TibetanReaderContent() {
                             className="modal-input"
                         />
                         <div className="modal-actions">
-                            <button onClick={() => setShowSaveDialog(false)} className="btn-cancel">Cancel</button>
-                            <button onClick={handleSaveCloud} className="btn-confirm">Save</button>
+                            <button onClick={() => setShowSaveDialog(false)} className="btn-cancel" disabled={isSaving}>Cancel</button>
+                            <button onClick={handleSaveCloud} className="btn-confirm" disabled={isSaving}>
+                                {isSaving ? 'Saving...' : 'Save'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -324,8 +340,8 @@ function TibetanReaderContent() {
                         <h3>Your Files</h3>
                         <ul className="file-list">
                             {userFiles.map(file => (
-                                <li key={file.filename} onClick={() => loadFile(file.filename)} className="file-item">
-                                    {file.filename}
+                                <li key={file.filename} onClick={() => !isLoadingFile && loadFile(file.filename)} className={`file-item ${isLoadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    {file.filename} {isLoadingFile && '(Loading...)'}
                                 </li>
                             ))}
                         </ul>
