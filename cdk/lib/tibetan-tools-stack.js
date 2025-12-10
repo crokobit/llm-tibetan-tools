@@ -5,6 +5,7 @@ const lambda = require('aws-cdk-lib/aws-lambda');
 const apigw = require('aws-cdk-lib/aws-apigatewayv2');
 const { HttpLambdaIntegration } = require('@aws-cdk/aws-apigatewayv2-integrations-alpha');
 const path = require('path');
+require('dotenv').config(); // Load environment variables from .env file
 
 class TibetanToolsStack extends Stack {
     constructor(scope, id, props) {
@@ -37,6 +38,14 @@ class TibetanToolsStack extends Stack {
 
         const backendPath = path.join(__dirname, '../../backend');
 
+        // Secrets (Read from environment variables loaded by dotenv)
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || this.node.tryGetContext('GOOGLE_CLIENT_ID');
+        const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || this.node.tryGetContext('GOOGLE_CLIENT_SECRET');
+
+        if (!googleClientId || !googleClientSecret) {
+            console.warn('WARNING: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET. Authentication will fail.');
+        }
+
         // Common Lambda Props
         const commonProps = {
             runtime: lambda.Runtime.NODEJS_18_X,
@@ -44,9 +53,25 @@ class TibetanToolsStack extends Stack {
             environment: {
                 TABLE_NAME: table.tableName,
                 BUCKET_NAME: bucket.bucketName,
+                GOOGLE_CLIENT_ID: googleClientId,
+                GOOGLE_CLIENT_SECRET: googleClientSecret,
             },
             timeout: Duration.seconds(10),
         };
+
+        // Login Function
+        const loginFunction = new lambda.Function(this, 'LoginFunction', {
+            ...commonProps,
+            handler: 'login.handler',
+        });
+        table.grantReadWriteData(loginFunction); // Needs to write tokens
+
+        // Refresh Function
+        const refreshFunction = new lambda.Function(this, 'RefreshFunction', {
+            ...commonProps,
+            handler: 'refresh.handler',
+        });
+        table.grantReadWriteData(refreshFunction); // Needs to read tokens
 
         // Save File Function
         const saveFileFunction = new lambda.Function(this, 'SaveFileFunction', {
@@ -79,6 +104,18 @@ class TibetanToolsStack extends Stack {
                 allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.OPTIONS],
                 allowOrigins: ['*'], // Restrict in production
             },
+        });
+
+        httpApi.addRoutes({
+            path: '/login',
+            methods: [apigw.HttpMethod.POST],
+            integration: new HttpLambdaIntegration('LoginIntegration', loginFunction),
+        });
+
+        httpApi.addRoutes({
+            path: '/refresh',
+            methods: [apigw.HttpMethod.POST],
+            integration: new HttpLambdaIntegration('RefreshIntegration', refreshFunction),
         });
 
         httpApi.addRoutes({

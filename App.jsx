@@ -12,7 +12,7 @@ function TibetanReaderContent() {
     const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
     const { selectMode, setSelectMode } = useSelection();
-    const { user, token, signIn, logout } = useAuth();
+    const { user, token, signIn, logout, refreshSession } = useAuth();
     const [showFileList, setShowFileList] = useState(false);
     const [userFiles, setUserFiles] = useState([]);
     const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -77,8 +77,17 @@ function TibetanReaderContent() {
         } catch (error) {
             console.error(error);
             if (error.message === 'Unauthorized') {
-                alert('Session expired. Please login again.');
-                logout();
+                try {
+                    const newToken = await refreshSession();
+                    // Retry with new token
+                    await saveFile(newToken, saveFilename, content);
+                    setShowSaveDialog(false);
+                    setSaveFilename('');
+                    alert('File saved successfully!');
+                } catch (refreshError) {
+                    alert('Session expired. Please login again.');
+                    logout();
+                }
             } else {
                 alert('Failed to save file.');
             }
@@ -93,8 +102,16 @@ function TibetanReaderContent() {
         } catch (error) {
             console.error(error);
             if (error.message === 'Unauthorized') {
-                alert('Session expired. Please login again.');
-                logout();
+                try {
+                    const newToken = await refreshSession();
+                    // Retry with new token
+                    const files = await listFiles(newToken);
+                    setUserFiles(files);
+                    setShowFileList(true);
+                } catch (refreshError) {
+                    alert('Session expired. Please login again.');
+                    logout();
+                }
             } else {
                 alert('Failed to list files.');
             }
@@ -115,8 +132,19 @@ function TibetanReaderContent() {
         } catch (error) {
             console.error(error);
             if (error.message === 'Unauthorized') {
-                alert('Session expired. Please login again.');
-                logout();
+                try {
+                    const newToken = await refreshSession();
+                    // Retry with new token
+                    const response = await getFile(newToken, filename);
+                    if (response && response.content) {
+                        const data = JSON.parse(response.content);
+                        setDocumentData(data);
+                        setShowFileList(false);
+                    }
+                } catch (refreshError) {
+                    alert('Session expired. Please login again.');
+                    logout();
+                }
             } else {
                 alert('Failed to load file.');
             }

@@ -1,2 +1,5 @@
 node_modules/
 dist/
+cdk.context.json
+.env
+.DS_Store
