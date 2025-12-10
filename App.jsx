@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProviders, useDocument, useEdit, useSelection, useAuth } from './contexts/index.jsx';
-import { saveFile, listFiles, getFile } from './utils/api.js';
+import { saveFile, listFiles, getFile, analyzeText } from './utils/api.js';
 import AnalysisParser from './logic/AnalysisParser.js';
+import ResponseProcessor from './logic/ResponseProcessor.js';
 import EditPopover from './components/EditPopover.jsx';
+import AnalyzeModal from './components/AnalyzeModal.jsx';
 import RichTextBlock from './components/RichTextBlock.jsx';
 import TibetanBlock from './components/TibetanBlock.jsx';
 
@@ -20,6 +22,8 @@ function TibetanReaderContent() {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingFiles, setIsLoadingFiles] = useState(false);
     const [isLoadingFile, setIsLoadingFile] = useState(false);
+    const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [notification, setNotification] = useState(null);
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
@@ -171,6 +175,40 @@ function TibetanReaderContent() {
         }
     };
 
+    const handleAnalyze = async (text) => {
+        setIsAnalyzing(true);
+        try {
+            const response = await analyzeText(token, text);
+            if (response && response.result) {
+                const newBlocks = ResponseProcessor.process(response.result);
+                setDocumentData(prev => [...prev, ...newBlocks]);
+                setShowAnalyzeModal(false);
+                showToast('Analysis complete!');
+            }
+        } catch (error) {
+            console.error(error);
+            if (error.message === 'Unauthorized') {
+                try {
+                    const newToken = await refreshSession();
+                    const response = await analyzeText(newToken, text);
+                    if (response && response.result) {
+                        const newBlocks = ResponseProcessor.process(response.result);
+                        setDocumentData(prev => [...prev, ...newBlocks]);
+                        setShowAnalyzeModal(false);
+                        showToast('Analysis complete!');
+                    }
+                } catch (refreshError) {
+                    showToast('Session expired. Please login again.');
+                    logout();
+                }
+            } else {
+                showToast('Analysis failed: ' + error.message);
+            }
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handleBlockUpdate = (blockIdx, newBlock) => {
         setDocumentData(prev => {
             const newData = [...prev];
@@ -238,6 +276,15 @@ function TibetanReaderContent() {
                             >
                                 Export Text
                             </button>
+                            {user && (
+                                <button
+                                    onClick={() => setShowAnalyzeModal(true)}
+                                    className="btn-export"
+                                    style={{ backgroundColor: '#8b5cf6' }}
+                                >
+                                    Analyze Text
+                                </button>
+                            )}
                             {user && (
                                 <>
                                     <button
@@ -334,6 +381,14 @@ function TibetanReaderContent() {
 
             {/* Edit Popover */}
             <EditPopover />
+
+            {/* Analyze Modal */}
+            <AnalyzeModal
+                isOpen={showAnalyzeModal}
+                onClose={() => setShowAnalyzeModal(false)}
+                onAnalyze={handleAnalyze}
+                isAnalyzing={isAnalyzing}
+            />
 
             {/* Save Dialog */}
             {showSaveDialog && (

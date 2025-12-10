@@ -58,3 +58,25 @@ export const getFile = async (token, filename) => {
 
     return response.json();
 };
+
+export const analyzeText = async (token, text) => {
+    const response = await fetch(`${API_BASE_URL}/analyze`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text })
+    });
+
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to analyze text');
+    }
+
+    return response.json();
+};

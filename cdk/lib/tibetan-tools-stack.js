@@ -97,6 +97,21 @@ class TibetanToolsStack extends Stack {
         table.grantReadData(getFileFunction);
 
 
+        // Analyze Function
+        const analyzeFunction = new lambda.Function(this, 'AnalyzeFunction', {
+            ...commonProps,
+            handler: 'analyze.handler',
+            environment: {
+                ...commonProps.environment,
+                OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+                LLM_PROVIDER: process.env.LLM_PROVIDER || 'openai',
+                OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o',
+                GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+            },
+            timeout: Duration.seconds(60), // Analysis might take longer
+        });
+
         // API Gateway
         const httpApi = new apigw.HttpApi(this, 'TibetanToolsApi', {
             corsPreflight: {
@@ -134,6 +149,12 @@ class TibetanToolsStack extends Stack {
             path: '/get',
             methods: [apigw.HttpMethod.GET],
             integration: new HttpLambdaIntegration('GetFileIntegration', getFileFunction),
+        });
+
+        httpApi.addRoutes({
+            path: '/analyze',
+            methods: [apigw.HttpMethod.POST],
+            integration: new HttpLambdaIntegration('AnalyzeIntegration', analyzeFunction),
         });
 
         new CfnOutput(this, 'ApiUrl', {
