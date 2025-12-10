@@ -76,7 +76,12 @@ function TibetanReaderContent() {
             alert('File saved successfully!');
         } catch (error) {
             console.error(error);
-            alert('Failed to save file.');
+            if (error.message === 'Unauthorized') {
+                alert('Session expired. Please login again.');
+                logout();
+            } else {
+                alert('Failed to save file.');
+            }
         }
     };
 
@@ -87,7 +92,12 @@ function TibetanReaderContent() {
             setShowFileList(true);
         } catch (error) {
             console.error(error);
-            alert('Failed to list files.');
+            if (error.message === 'Unauthorized') {
+                alert('Session expired. Please login again.');
+                logout();
+            } else {
+                alert('Failed to list files.');
+            }
         }
     };
 
@@ -104,7 +114,12 @@ function TibetanReaderContent() {
             }
         } catch (error) {
             console.error(error);
-            alert('Failed to load file.');
+            if (error.message === 'Unauthorized') {
+                alert('Session expired. Please login again.');
+                logout();
+            } else {
+                alert('Failed to load file.');
+            }
         }
     };
 

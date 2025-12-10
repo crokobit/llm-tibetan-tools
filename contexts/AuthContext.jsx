@@ -14,9 +14,18 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const storedToken = localStorage.getItem('google_token');
         const storedUser = localStorage.getItem('google_user');
-        if (storedToken && storedUser) {
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
+        const storedExpiresAt = localStorage.getItem('google_token_expires_at');
+
+        if (storedToken && storedUser && storedExpiresAt) {
+            if (Date.now() < parseInt(storedExpiresAt)) {
+                setToken(storedToken);
+                setUser(JSON.parse(storedUser));
+            } else {
+                // Token expired
+                localStorage.removeItem('google_token');
+                localStorage.removeItem('google_user');
+                localStorage.removeItem('google_token_expires_at');
+            }
         }
     }, []);
 
@@ -24,6 +33,11 @@ export const AuthProvider = ({ children }) => {
         onSuccess: async (tokenResponse) => {
             setToken(tokenResponse.access_token);
             localStorage.setItem('google_token', tokenResponse.access_token);
+
+            // Calculate expiration time (default to 1 hour if not provided, though it usually is)
+            const expiresIn = tokenResponse.expires_in || 3600;
+            const expiresAt = Date.now() + expiresIn * 1000;
+            localStorage.setItem('google_token_expires_at', expiresAt);
 
             try {
                 const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -45,6 +59,7 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         localStorage.removeItem('google_token');
         localStorage.removeItem('google_user');
+        localStorage.removeItem('google_token_expires_at');
     };
 
     return (

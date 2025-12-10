@@ -10,6 +10,10 @@ export const saveFile = async (token, filename, content) => {
         body: JSON.stringify({ filename, content })
     });
 
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
     if (!response.ok) {
         throw new Error('Failed to save file');
     }
@@ -25,6 +29,10 @@ export const listFiles = async (token) => {
         }
     });
 
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
     if (!response.ok) {
         throw new Error('Failed to list files');
     }
@@ -39,6 +47,10 @@ export const getFile = async (token, filename) => {
             'Authorization': `Bearer ${token}`
         }
     });
+
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
 
     if (!response.ok) {
         throw new Error('Failed to get file');
