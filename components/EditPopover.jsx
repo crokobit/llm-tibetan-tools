@@ -5,8 +5,8 @@ import { useEdit } from '../contexts/index.jsx';
 const POS_TYPES = [
     { id: 'n', label: 'n', features: ['hon'] },
     { id: 'v', label: 'v', features: ['hon', 'tense'] },
-    { id: 'vd', label: 'vd', features: [] },
-    { id: 'vnd', label: 'vnd', features: [] },
+    { id: 'vd', label: 'vd', features: ['hon', 'tense'] },
+    { id: 'vnd', label: 'vnd', features: ['hon', 'tense'] },
     { id: 'adj', label: 'adj', features: [] },
     { id: 'adv', label: 'adv', features: [] },
     { id: 'part', label: 'part', features: [] },
@@ -301,22 +301,32 @@ const EditPopover = () => {
         }, parentMode);
     };
 
-    const handleStartNodeChange = (posId) => {
-        // Toggle selection for multi-select
-        if (startNode.includes(posId)) {
-            setStartNode(startNode.filter(id => id !== posId));
+    const handleStartNodeChange = (posId, isLongPress) => {
+        if (isLongPress) {
+            // Toggle selection for multi-select (AND logic)
+            if (startNode.includes(posId)) {
+                setStartNode(startNode.filter(id => id !== posId));
+            } else {
+                setStartNode([...startNode, posId]);
+            }
         } else {
-            setStartNode([...startNode, posId]);
+            // Replace selection (Single select)
+            setStartNode([posId]);
         }
         setStartAttrs({ hon: false, tense: [] });
     };
 
-    const handleEndNodeChange = (posId) => {
-        // Toggle selection for multi-select
-        if (endNode.includes(posId)) {
-            setEndNode(endNode.filter(id => id !== posId));
+    const handleEndNodeChange = (posId, isLongPress) => {
+        if (isLongPress) {
+            // Toggle selection for multi-select (AND logic)
+            if (endNode.includes(posId)) {
+                setEndNode(endNode.filter(id => id !== posId));
+            } else {
+                setEndNode([...endNode, posId]);
+            }
         } else {
-            setEndNode([...endNode, posId]);
+            // Replace selection (Single select)
+            setEndNode([posId]);
         }
         setEndAttrs({ hon: false, tense: [] });
     };
@@ -368,15 +378,47 @@ const EditPopover = () => {
         );
     };
 
-    const PosButton = ({ type, selected, onClick, disabled }) => (
-        <button
-            onClick={() => !disabled && onClick(type.id)}
-            disabled={disabled}
-            className={`pos-button pos-button-${type.id} ${selected ? 'selected' : ''}`}
-        >
-            {type.label}
-        </button>
-    );
+    const PosButton = ({ type, selected, onClick, disabled }) => {
+        const timerRef = useRef(null);
+        const isLongPress = useRef(false);
+
+        const handleMouseDown = () => {
+            if (disabled) return;
+            isLongPress.current = false;
+            timerRef.current = setTimeout(() => {
+                isLongPress.current = true;
+                onClick(type.id, true); // Trigger long press action
+            }, 500); // 500ms threshold
+        };
+
+        const handleMouseUp = () => {
+            if (disabled) return;
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+            if (!isLongPress.current) {
+                onClick(type.id, false); // Trigger click action
+            }
+        };
+
+        const handleMouseLeave = () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+
+        return (
+            <button
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+                disabled={disabled}
+                className={`pos-button pos-button-${type.id} ${selected ? 'selected' : ''}`}
+            >
+                {type.label}
+            </button>
+        );
+    };
 
     return (
         <div
