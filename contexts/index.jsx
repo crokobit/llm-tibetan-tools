@@ -10,11 +10,21 @@ import { SelectionProvider, useSelection } from './SelectionContext.jsx';
  * Order matters! DocumentProvider must come first since EditProvider depends on it,
  * and SelectionProvider depends on both DocumentProvider and EditProvider.
  */
+import { AuthProvider, useAuth } from './AuthContext.jsx';
+
+/**
+ * Composed provider that wraps all context providers.
+ * Use this single component in your App instead of nesting multiple providers.
+ * 
+ * Order matters! DocumentProvider must come first since EditProvider depends on it,
+ * and SelectionProvider depends on both DocumentProvider and EditProvider.
+ */
 export const AppProviders = composeProviders(
+    AuthProvider,
     DocumentProvider,
     EditProvider,
     SelectionProvider
 );
 
 // Re-export hooks for convenience
-export { useDocument, useEdit, useSelection };
+export { useAuth, useDocument, useEdit, useSelection };

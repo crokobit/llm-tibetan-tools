@@ -1,0 +1,19 @@
+{
+    "app": "node bin/tibetan-tools.js",
+    "watch": {
+        "include": [
+            "**"
+        ],
+        "exclude": [
+            "README.md",
+            "cdk*.json",
+            "**/*.d.ts",
+            "**/*.js.map",
+            "tsconfig.json",
+            "package*.json",
+            "yarn.lock",
+            "node_modules",
+            "test"
+        ]
+    }
+}

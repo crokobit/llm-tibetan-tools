@@ -14,7 +14,9 @@
   "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@react-oauth/google": "^0.12.2",
     "@vitejs/plugin-react": "^5.1.1",
+    "jwt-decode": "^4.0.0",
     "mammoth": "^1.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

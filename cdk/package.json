@@ -1,0 +1,21 @@
+{
+    "name": "tibetan-tools-cdk",
+    "version": "0.1.0",
+    "bin": {
+        "tibetan-tools": "bin/tibetan-tools.js"
+    },
+    "scripts": {
+        "build": "echo \"The build step is not required when using JavaScript!\"",
+        "cdk": "cdk"
+    },
+    "devDependencies": {
+        "aws-cdk": "^2.1033.0"
+    },
+    "dependencies": {
+        "@aws-cdk/aws-apigatewayv2-alpha": "^2.114.1-alpha.0",
+        "@aws-cdk/aws-apigatewayv2-integrations-alpha": "^2.114.1-alpha.0",
+        "@aws-sdk/client-s3": "^3.947.0",
+        "aws-cdk-lib": "latest",
+        "constructs": "^10.0.0"
+    }
+}

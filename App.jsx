@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import { AppProviders, useDocument, useEdit, useSelection } from './contexts/index.jsx';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AppProviders, useDocument, useEdit, useSelection, useAuth } from './contexts/index.jsx';
+import { saveFile, listFiles, getFile } from './utils/api.js';
 import AnalysisParser from './logic/AnalysisParser.js';
 import EditPopover from './components/EditPopover.jsx';
 import RichTextBlock from './components/RichTextBlock.jsx';
@@ -10,6 +12,11 @@ function TibetanReaderContent() {
     const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
     const { selectMode, setSelectMode } = useSelection();
+    const { user, token, signIn, logout } = useAuth();
+    const [showFileList, setShowFileList] = useState(false);
+    const [userFiles, setUserFiles] = useState([]);
+    const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [saveFilename, setSaveFilename] = useState('');
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
@@ -59,6 +66,48 @@ function TibetanReaderContent() {
         a.click();
     };
 
+    const handleSaveCloud = async () => {
+        if (!saveFilename) return;
+        try {
+            const content = JSON.stringify(documentData);
+            await saveFile(token, saveFilename, content);
+            setShowSaveDialog(false);
+            setSaveFilename('');
+            alert('File saved successfully!');
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save file.');
+        }
+    };
+
+    const handleOpenCloud = async () => {
+        try {
+            const files = await listFiles(token);
+            setUserFiles(files);
+            setShowFileList(true);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to list files.');
+        }
+    };
+
+    const loadFile = async (filename) => {
+        try {
+            const response = await getFile(token, filename);
+            // Expecting response to be { content: "stringified_json" }
+            if (response && response.content) {
+                const data = JSON.parse(response.content);
+                setDocumentData(data);
+                setShowFileList(false);
+            } else {
+                throw new Error("Invalid file format");
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Failed to load file.');
+        }
+    };
+
     const handleBlockUpdate = (blockIdx, newBlock) => {
         setDocumentData(prev => {
             const newData = [...prev];
@@ -92,6 +141,16 @@ function TibetanReaderContent() {
                 {/* Header */}
                 <div className="app-header">
                     <h1 className="app-header-title">Tibetan Text Analyzer</h1>
+                    <div className="auth-controls">
+                        {user ? (
+                            <div className="user-info">
+                                <span className="user-name">Welcome, {user.name}</span>
+                                <button onClick={logout} className="btn-auth">Logout</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => signIn()} className="btn-auth">Login with Google</button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Toolbar */}
@@ -110,6 +169,12 @@ function TibetanReaderContent() {
                             >
                                 Export Text
                             </button>
+                            {user && (
+                                <>
+                                    <button onClick={() => setShowSaveDialog(true)} className="btn-export">Save to Cloud</button>
+                                    <button onClick={handleOpenCloud} className="btn-export">Open from Cloud</button>
+                                </>
+                            )}
                             <div className="toolbar-controls-container">
                                 <label className="debug-mode-label">
                                     <input
@@ -188,6 +253,43 @@ function TibetanReaderContent() {
 
             {/* Edit Popover */}
             <EditPopover />
+
+            {/* Save Dialog */}
+            {showSaveDialog && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Save File</h3>
+                        <input
+                            type="text"
+                            value={saveFilename}
+                            onChange={(e) => setSaveFilename(e.target.value)}
+                            placeholder="Enter filename"
+                            className="modal-input"
+                        />
+                        <div className="modal-actions">
+                            <button onClick={() => setShowSaveDialog(false)} className="btn-cancel">Cancel</button>
+                            <button onClick={handleSaveCloud} className="btn-confirm">Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* File List Dialog */}
+            {showFileList && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Your Files</h3>
+                        <ul className="file-list">
+                            {userFiles.map(file => (
+                                <li key={file.filename} onClick={() => loadFile(file.filename)} className="file-item">
+                                    {file.filename}
+                                </li>
+                            ))}
+                        </ul>
+                        <button onClick={() => setShowFileList(false)} className="btn-cancel">Close</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -195,8 +297,10 @@ function TibetanReaderContent() {
 // Main component wrapped with providers
 export default function TibetanReader() {
     return (
-        <AppProviders>
-            <TibetanReaderContent />
-        </AppProviders>
+        <GoogleOAuthProvider clientId="642729519619-j2r2l2ccvi5g8b7ervhq73ok199na7ua.apps.googleusercontent.com">
+            <AppProviders>
+                <TibetanReaderContent />
+            </AppProviders>
+        </GoogleOAuthProvider>
     );
 }
