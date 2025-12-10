@@ -1,14 +1,16 @@
 # System Architecture: Tibetan LLM Tools
 
-This document details the architecture for the Tibetan LLM Tools application. The system is designed as a client-side static application hosted on GitHub Pages, leveraging browser-based APIs and direct calls to AI services where applicable.
+This document details the architecture for the Tibetan LLM Tools application. The system is designed as a hybrid application: a client-side static frontend hosted on GitHub Pages, and a serverless backend on AWS for user data persistence.
 
 ## High-Level Architecture
 
-The application follows a modern static web architecture:
+The application follows a modern serverless web architecture:
 1.  **Presentation Layer**: Static single-page application (SPA) built with React and Vite.
-2.  **Hosting**: GitHub Pages.
-3.  **CI/CD**: GitHub Actions for automated building and deployment.
-4.  **AI Integration**: Direct integration with Google Gemini API (client-side).
+2.  **Hosting**: GitHub Pages (Frontend).
+3.  **Authentication**: Google OAuth 2.0 (Implicit Flow).
+4.  **Backend**: AWS Serverless (Lambda, API Gateway).
+5.  **Data Storage**: Amazon DynamoDB (Metadata) and Amazon S3 (File Content).
+6.  **AI Integration**: Direct integration with Google Gemini API (client-side).
 
 ### Architecture Diagram
 
@@ -21,20 +23,40 @@ flowchart TD
     end
 
     %% ===== Hosting =====
-    subgraph Hosting["Hosting Provider"]
+    subgraph Hosting["Frontend Hosting"]
         GHPages[GitHub Pages]
+    end
+
+    %% ===== Auth =====
+    subgraph Auth["Authentication"]
+        GoogleAuth[Google OAuth 2.0]
+    end
+
+    %% ===== Backend =====
+    subgraph Backend["AWS Serverless Backend"]
+        APIGW[API Gateway]
+        Lambda[AWS Lambda]
+        DynamoDB[DynamoDB]
+        S3[Amazon S3]
     end
 
     %% ===== External Services =====
     subgraph External_Services["External Services"]
-        Gemini["Google Gemini API<br>(Gemini 1.5 Flash)"]
+        Gemini["Google Gemini API<br>Gemini 1.5 Flash"]
     end
 
     %% ===== Flows =====
     User -->|HTTPS Request| GHPages
     GHPages -->|Serve Static Assets| User
     
-    User -->|API Calls (Direct)| Gemini
+    User -->|Login| GoogleAuth
+    GoogleAuth -->|ID Token| User
+    User -->|API Calls Save/Load| APIGW
+    APIGW -->|Route Request| Lambda
+    Lambda -->|Read/Write Metadata| DynamoDB
+    Lambda -->|Read/Write Content| S3
+
+    User -->|API Calls Direct| Gemini
 
 ```
 
@@ -46,23 +68,30 @@ flowchart TD
 *   **Technology**: React 18, Vite.
 *   **Hosting**: **GitHub Pages**.
 *   **Deployment**: Automated via **GitHub Actions**.
-*   **State Management**: React Context API (`SelectionContext`).
+*   **State Management**: React Context API (`SelectionContext`, `AuthContext`).
+*   **Authentication**: `@react-oauth/google` for Google Sign-In.
 
-### 2. AI Integration
+### 2. Backend (Serverless Layer)
+*   **Infrastructure as Code**: AWS CDK.
+*   **API Gateway**: HTTP API exposing Lambda functions.
+*   **AWS Lambda**: Node.js functions for business logic:
+    *   `save_file`: Saves file content to S3 and metadata to DynamoDB.
+    *   `list_files`: Queries DynamoDB for user's files.
+    *   `get_file`: Retrieves file content from S3.
+*   **Storage**:
+    *   **DynamoDB**: Stores file metadata (filename, userId, timestamp). Partition Key: `userId`, Sort Key: `filename`.
+    *   **S3**: Stores the actual file content (JSON/Text). Key: `{userId}/{filename}`.
+
+### 3. AI Integration
 *   **Service**: **Google Gemini API** (Gemini 1.5 Flash).
 *   **Integration Pattern**: Direct client-side calls using the Google Generative AI SDK.
-*   **Configuration**: API Key is managed via user input or local storage (to be implemented/verified).
-
-### 3. Infrastructure & Deployment
-*   **Platform**: GitHub Pages.
-*   **CI/CD**: GitHub Actions workflow (`.github/workflows/deploy.yml`).
-    *   Triggers on push to `main`.
-    *   Builds the Vite project.
-    *   Deploys the `dist` folder to the `gh-pages` environment.
 
 ## Security Considerations
-*   **API Keys**: Since the application is client-side, care must be taken with API keys. Users may need to provide their own keys, or keys should be proxied if a backend is reintroduced. Currently, the architecture assumes a client-side model.
+*   **Authentication**: Google OAuth 2.0 ensures secure user identity.
+*   **Authorization**: Backend validates Google ID Tokens before allowing access to user data.
+*   **Data Isolation**: Users can only access their own files (enforced by `userId` from the ID Token).
+*   **API Keys**: Gemini API keys are managed client-side (user input or local storage).
 
 ## Scalability
-*   **Static Hosting**: GitHub Pages handles static asset scaling automatically.
-*   **Client-Side Compute**: Processing is offloaded to the user's device and the external AI API.
+*   **Frontend**: GitHub Pages handles static asset scaling automatically.
+*   **Backend**: AWS Serverless (Lambda/DynamoDB/S3) scales automatically with demand.
