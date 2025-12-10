@@ -176,7 +176,20 @@ exports.handler = async (event) => {
             };
         }
 
-        const user = await verifyToken(token);
+        let user;
+        try {
+            user = await verifyToken(token);
+        } catch (error) {
+            console.error('Token verification failed:', error);
+            return {
+                statusCode: 401,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                body: JSON.stringify({ error: 'Invalid or expired token' })
+            };
+        }
 
         // Authorization: Only allow specific email
         if (user.email !== 'crokobit@gmail.com') {

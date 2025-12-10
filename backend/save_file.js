@@ -22,7 +22,13 @@ exports.handler = async (event) => {
             return { statusCode: 401, body: JSON.stringify({ error: 'No token provided' }) };
         }
 
-        const user = await verifyToken(token);
+        let user;
+        try {
+            user = await verifyToken(token);
+        } catch (error) {
+            console.error('Token verification failed:', error);
+            return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) };
+        }
         const userId = user.sub; // Google User ID
 
         const body = JSON.parse(event.body);
