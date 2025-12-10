@@ -20,8 +20,11 @@ function TibetanReaderContent() {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingFiles, setIsLoadingFiles] = useState(false);
     const [isLoadingFile, setIsLoadingFile] = useState(false);
+    const [notification, setNotification] = useState(null);
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
+
+    const isApiBusy = isSaving || isLoadingFiles || isLoadingFile;
 
     // Load mammoth.js library
     useEffect(() => {
@@ -36,6 +39,11 @@ function TibetanReaderContent() {
         document.body.appendChild(script);
     }, [setIsMammothLoaded]);
 
+
+    const showToast = (message) => {
+        setNotification(message);
+        setTimeout(() => setNotification(null), 2000);
+    };
 
     // Generate Output
     const debugText = useMemo(() => {
@@ -76,8 +84,7 @@ function TibetanReaderContent() {
             const content = JSON.stringify(documentData);
             await saveFile(token, saveFilename, content);
             setShowSaveDialog(false);
-            setSaveFilename('');
-            alert('File saved successfully!');
+            showToast('File saved successfully!');
         } catch (error) {
             console.error(error);
             if (error.message === 'Unauthorized') {
@@ -86,14 +93,13 @@ function TibetanReaderContent() {
                     // Retry with new token
                     await saveFile(newToken, saveFilename, content);
                     setShowSaveDialog(false);
-                    setSaveFilename('');
-                    alert('File saved successfully!');
+                    showToast('File saved successfully!');
                 } catch (refreshError) {
-                    alert('Session expired. Please login again.');
+                    showToast('Session expired. Please login again.');
                     logout();
                 }
             } else {
-                alert('Failed to save file.');
+                showToast('Failed to save file.');
             }
         } finally {
             setIsSaving(false);
@@ -116,11 +122,11 @@ function TibetanReaderContent() {
                     setUserFiles(files);
                     setShowFileList(true);
                 } catch (refreshError) {
-                    alert('Session expired. Please login again.');
+                    showToast('Session expired. Please login again.');
                     logout();
                 }
             } else {
-                alert('Failed to list files.');
+                showToast('Failed to list files.');
             }
         } finally {
             setIsLoadingFiles(false);
@@ -135,6 +141,7 @@ function TibetanReaderContent() {
             if (response && response.content) {
                 const data = JSON.parse(response.content);
                 setDocumentData(data);
+                setSaveFilename(filename);
                 setShowFileList(false);
             } else {
                 throw new Error("Invalid file format");
@@ -149,14 +156,15 @@ function TibetanReaderContent() {
                     if (response && response.content) {
                         const data = JSON.parse(response.content);
                         setDocumentData(data);
+                        setSaveFilename(filename);
                         setShowFileList(false);
                     }
                 } catch (refreshError) {
-                    alert('Session expired. Please login again.');
+                    showToast('Session expired. Please login again.');
                     logout();
                 }
             } else {
-                alert('Failed to load file.');
+                showToast('Failed to load file.');
             }
         } finally {
             setIsLoadingFile(false);
@@ -210,12 +218,18 @@ function TibetanReaderContent() {
 
                 {/* Toolbar */}
                 <div className="toolbar-container">
-                    <input
-                        type="file"
-                        accept=".docx,.txt"
-                        onChange={handleFileUpload}
-                        className="file-input-custom"
-                    />
+                    {saveFilename ? (
+                        <div className="file-input-custom" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontWeight: 600, color: '#2563eb' }}>{saveFilename}</span>
+                        </div>
+                    ) : (
+                        <input
+                            type="file"
+                            accept=".docx,.txt"
+                            onChange={handleFileUpload}
+                            className="file-input-custom"
+                        />
+                    )}
                     {documentData.length > 0 && (
                         <>
                             <button
@@ -226,8 +240,18 @@ function TibetanReaderContent() {
                             </button>
                             {user && (
                                 <>
-                                    <button onClick={() => setShowSaveDialog(true)} className="btn-export">Save to Cloud</button>
-                                    <button onClick={handleOpenCloud} disabled={isLoadingFiles} className="btn-export">
+                                    <button
+                                        onClick={() => saveFilename ? handleSaveCloud() : setShowSaveDialog(true)}
+                                        className={`btn-export ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={isApiBusy}
+                                    >
+                                        {isSaving ? 'Saving...' : (saveFilename ? 'Save' : 'Save to Cloud')}
+                                    </button>
+                                    <button
+                                        onClick={handleOpenCloud}
+                                        disabled={isApiBusy}
+                                        className={`btn-export ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
                                         {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
                                     </button>
                                 </>
@@ -324,8 +348,8 @@ function TibetanReaderContent() {
                             className="modal-input"
                         />
                         <div className="modal-actions">
-                            <button onClick={() => setShowSaveDialog(false)} className="btn-cancel" disabled={isSaving}>Cancel</button>
-                            <button onClick={handleSaveCloud} className="btn-confirm" disabled={isSaving}>
+                            <button onClick={() => setShowSaveDialog(false)} className="btn-cancel" disabled={isApiBusy}>Cancel</button>
+                            <button onClick={handleSaveCloud} className="btn-confirm" disabled={isApiBusy}>
                                 {isSaving ? 'Saving...' : 'Save'}
                             </button>
                         </div>
@@ -340,13 +364,20 @@ function TibetanReaderContent() {
                         <h3>Your Files</h3>
                         <ul className="file-list">
                             {userFiles.map(file => (
-                                <li key={file.filename} onClick={() => !isLoadingFile && loadFile(file.filename)} className={`file-item ${isLoadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                <li key={file.filename} onClick={() => !isApiBusy && loadFile(file.filename)} className={`file-item ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                     {file.filename} {isLoadingFile && '(Loading...)'}
                                 </li>
                             ))}
                         </ul>
                         <button onClick={() => setShowFileList(false)} className="btn-cancel">Close</button>
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {notification && (
+                <div className="toast-notification">
+                    {notification}
                 </div>
             )}
         </div>
