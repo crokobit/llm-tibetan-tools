@@ -97,20 +97,56 @@ class TibetanToolsStack extends Stack {
         table.grantReadData(getFileFunction);
 
 
-        // Analyze Function
-        const analyzeFunction = new lambda.Function(this, 'AnalyzeFunction', {
+        // Jobs Table
+        const jobsTable = new dynamodb.Table(this, 'TibetanToolsJobs', {
+            partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
+            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+            removalPolicy: RemovalPolicy.DESTROY, // NOT RECOMMENDED FOR PRODUCTION
+            timeToLiveAttribute: 'ttl', // Auto-delete old jobs
+        });
+
+        // Analyze Worker Function (Long running)
+        const analyzeWorkerFunction = new lambda.Function(this, 'AnalyzeWorkerFunction', {
             ...commonProps,
-            handler: 'analyze.handler',
+            handler: 'analyze_worker.handler',
             environment: {
                 ...commonProps.environment,
+                JOBS_TABLE_NAME: jobsTable.tableName,
                 OPENAI_API_KEY: process.env.OPENAI_API_KEY,
                 GEMINI_API_KEY: process.env.GEMINI_API_KEY,
                 LLM_PROVIDER: process.env.LLM_PROVIDER || 'openai',
                 OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o',
                 GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
             },
-            timeout: Duration.seconds(60), // Analysis might take longer
+            timeout: Duration.seconds(300), // 5 minutes
+            logRetention: require('aws-cdk-lib/aws-logs').RetentionDays.ONE_WEEK,
         });
+        jobsTable.grantWriteData(analyzeWorkerFunction);
+
+        // Analyze Function (Dispatcher)
+        const analyzeFunction = new lambda.Function(this, 'AnalyzeFunction', {
+            ...commonProps,
+            handler: 'analyze.handler',
+            environment: {
+                ...commonProps.environment,
+                JOBS_TABLE_NAME: jobsTable.tableName,
+                WORKER_FUNCTION_NAME: analyzeWorkerFunction.functionName,
+            },
+            timeout: Duration.seconds(10), // Short timeout, just dispatches
+        });
+        jobsTable.grantWriteData(analyzeFunction);
+        analyzeWorkerFunction.grantInvoke(analyzeFunction);
+
+        // Get Job Function
+        const getJobFunction = new lambda.Function(this, 'GetJobFunction', {
+            ...commonProps,
+            handler: 'get_job.handler',
+            environment: {
+                ...commonProps.environment,
+                JOBS_TABLE_NAME: jobsTable.tableName,
+            },
+        });
+        jobsTable.grantReadData(getJobFunction);
 
         // API Gateway
         const httpApi = new apigw.HttpApi(this, 'TibetanToolsApi', {
@@ -155,6 +191,12 @@ class TibetanToolsStack extends Stack {
             path: '/analyze',
             methods: [apigw.HttpMethod.POST],
             integration: new HttpLambdaIntegration('AnalyzeIntegration', analyzeFunction),
+        });
+
+        httpApi.addRoutes({
+            path: '/job/{jobId}',
+            methods: [apigw.HttpMethod.GET],
+            integration: new HttpLambdaIntegration('GetJobIntegration', getJobFunction),
         });
 
         new CfnOutput(this, 'ApiUrl', {

@@ -178,32 +178,63 @@ function TibetanReaderContent() {
     const handleAnalyze = async (text) => {
         setIsAnalyzing(true);
         try {
-            const response = await analyzeText(token, text);
-            if (response && response.result) {
-                const newBlocks = ResponseProcessor.process(response.result);
-                setDocumentData(prev => [...prev, ...newBlocks]);
-                setShowAnalyzeModal(false);
-                showToast('Analysis complete!');
+            // STEP 1: Start Analysis Job
+            let jobResponse;
+            try {
+                jobResponse = await analyzeText(token, text);
+            } catch (error) {
+                if (error.message === 'Unauthorized') {
+                    const newToken = await refreshSession();
+                    jobResponse = await analyzeText(newToken, text);
+                } else {
+                    throw error;
+                }
             }
+
+            const { jobId } = jobResponse;
+            if (!jobId) throw new Error("No job ID returned");
+
+            showToast('Analysis started... please wait');
+
+            // STEP 2: Poll for Result
+            const pollInterval = 2000; // 2 seconds
+            const maxAttempts = 150; // 5 minutes (300s)
+
+            for (let i = 0; i < maxAttempts; i++) {
+                // Wait
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+                // Check Status
+                let jobStatus;
+                try {
+                    // Using api.js import implicitly, but need to make sure getJob is imported
+                    jobStatus = await import('./utils/api.js').then(m => m.getJob(token, jobId));
+                } catch (err) {
+                    if (err.message === 'Unauthorized') {
+                        const newToken = await refreshSession();
+                        jobStatus = await import('./utils/api.js').then(m => m.getJob(newToken, jobId));
+                    } else {
+                        throw err;
+                    }
+                }
+
+                if (jobStatus.status === 'COMPLETED') {
+                    const newBlocks = ResponseProcessor.process(jobStatus.result);
+                    setDocumentData(prev => [...prev, ...newBlocks]);
+                    setShowAnalyzeModal(false);
+                    showToast('Analysis complete!');
+                    return;
+                } else if (jobStatus.status === 'FAILED') {
+                    throw new Error(jobStatus.error || "Job failed");
+                }
+                // If PENDING, continue loop
+            }
+
+            throw new Error("Analysis timed out");
+
         } catch (error) {
             console.error(error);
-            if (error.message === 'Unauthorized') {
-                try {
-                    const newToken = await refreshSession();
-                    const response = await analyzeText(newToken, text);
-                    if (response && response.result) {
-                        const newBlocks = ResponseProcessor.process(response.result);
-                        setDocumentData(prev => [...prev, ...newBlocks]);
-                        setShowAnalyzeModal(false);
-                        showToast('Analysis complete!');
-                    }
-                } catch (refreshError) {
-                    showToast('Session expired. Please login again.');
-                    logout();
-                }
-            } else {
-                showToast('Analysis failed: ' + error.message);
-            }
+            showToast('Analysis failed: ' + error.message);
         } finally {
             setIsAnalyzing(false);
         }

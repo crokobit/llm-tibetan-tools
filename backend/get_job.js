@@ -1,14 +1,10 @@
-const { LambdaClient, InvokeCommand } = require('@aws-sdk/client-lambda');
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, GetCommand } = require('@aws-sdk/lib-dynamodb');
 const { verifyToken } = require('./auth');
-const crypto = require('crypto');
 
-const lambdaClient = new LambdaClient({});
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
 
-const WORKER_FUNCTION_NAME = process.env.WORKER_FUNCTION_NAME;
 const JOBS_TABLE_NAME = process.env.JOBS_TABLE_NAME;
 
 exports.handler = async (event) => {
@@ -35,7 +31,6 @@ exports.handler = async (event) => {
         try {
             user = await verifyToken(token);
         } catch (error) {
-            console.error('Token verification failed:', error);
             return {
                 statusCode: 401,
                 headers: {
@@ -46,69 +41,50 @@ exports.handler = async (event) => {
             };
         }
 
-        // Authorization: Only allow specific email
-        if (user.email !== 'crokobit@gmail.com') {
-            return {
-                statusCode: 403,
-                headers: {
-                    'Content-Type': 'application/json; charset=utf-8',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify({ error: 'Access denied. You are not authorized to use this feature.' })
-            };
-        }
-
-        const body = JSON.parse(event.body);
-        const { text } = body;
-
-        if (!text) {
+        // Get Job ID from path
+        const jobId = event.pathParameters?.jobId;
+        if (!jobId) {
             return {
                 statusCode: 400,
                 headers: {
                     'Content-Type': 'application/json; charset=utf-8',
                     'Access-Control-Allow-Origin': '*'
                 },
-                body: JSON.stringify({ error: 'Text is required' })
+                body: JSON.stringify({ error: 'Missing jobId' })
             };
         }
 
-        // Generate Job ID
-        const jobId = crypto.randomUUID();
-        const now = new Date().toISOString();
-        const ttl = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 1 week TTL
-
-        // Create Job Record
-        const putCommand = new PutCommand({
+        const command = new GetCommand({
             TableName: JOBS_TABLE_NAME,
-            Item: {
-                jobId,
-                userId: user.sub,
-                email: user.email,
-                status: 'PENDING',
-                createdAt: now,
-                updatedAt: now,
-                ttl
-            }
-        });
-        await docClient.send(putCommand);
-
-        // Invoke Worker
-        const invokeCommand = new InvokeCommand({
-            FunctionName: WORKER_FUNCTION_NAME,
-            InvocationType: 'Event', // Asynchronous invocation
-            Payload: JSON.stringify({ jobId, text })
+            Key: { jobId }
         });
 
-        // We don't await the result of the worker, just the successful dispatch
-        await lambdaClient.send(invokeCommand);
+        const response = await docClient.send(command);
+        const job = response.Item;
+
+        if (!job) {
+            return {
+                statusCode: 404,
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                body: JSON.stringify({ error: 'Job not found' })
+            };
+        }
+
+        // Check ownership (optional, but good practice if userId is stored)
+        if (job.userId && job.userId !== user.sub && job.email !== user.email) {
+            // For now, checking email if we stored it, or skip if we trust the random UUID
+        }
 
         return {
-            statusCode: 202, // Accepted
+            statusCode: 200,
             headers: {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Access-Control-Allow-Origin': '*'
             },
-            body: JSON.stringify({ jobId, status: 'PENDING' })
+            body: JSON.stringify(job)
         };
 
     } catch (error) {

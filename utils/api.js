@@ -80,3 +80,22 @@ export const analyzeText = async (token, text) => {
 
     return response.json();
 };
+
+export const getJob = async (token, jobId) => {
+    const response = await fetch(`${API_BASE_URL}/job/${jobId}`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        throw new Error('Failed to get job status');
+    }
+
+    return response.json();
+};

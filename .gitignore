@@ -3,3 +3,4 @@ dist/
 cdk.context.json
 .env
 .DS_Store
+cdk/cdk.out/
