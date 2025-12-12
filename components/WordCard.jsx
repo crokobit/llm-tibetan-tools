@@ -33,37 +33,14 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
     }, [isAnyEditActive]);
 
     // --- Resize Logic ---
-    const [isHoveringRight, setIsHoveringRight] = useState(false);
-    const [isHoveringLeft, setIsHoveringLeft] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
     const [resizeDirection, setResizeDirection] = useState(null); // 'left' or 'right'
     const dragStartX = React.useRef(null);
     const accumulatedDelta = React.useRef(0);
 
     const RESIZE_THRESHOLD = 20; // Pixels to drag to trigger a char move
-    const EDGE_SENSITIVITY = 25; // Pixels from edge to show resize cursor
 
-    const handleMouseMove = (e) => {
-        if (isAnyEditActive || isResizing) return;
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const mouseX = e.clientX;
-
-        // Check right edge
-        if (mouseX >= rect.right - EDGE_SENSITIVITY) {
-            setIsHoveringRight(true);
-            setIsHoveringLeft(false);
-        }
-        // Check left edge - Disable left resize for now as per plan focus on right edge mainly, 
-        // but user asked for "expand/shorten" which can be done from right edge (expand = take next, shorten = give next)
-        // Let's stick to Right Edge controlling the "End" of the word as is typical. 
-        // To control the "Start" of the word, one would resize the Previous word's right edge.
-        // So only Right Edge needed.
-        else {
-            setIsHoveringRight(false);
-            setIsHoveringLeft(false);
-        }
-    };
+    // Removed handleMouseMove logic in favor of explicit handle
 
     const handleGlobalMouseMove = React.useCallback((e) => {
         if (!dragStartX.current) return;
@@ -105,19 +82,16 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
         };
     }, [isResizing, handleGlobalMouseMove, handleGlobalMouseUp]);
 
-    const handleMouseDown = (e) => {
-        if (isHoveringRight) {
-            e.stopPropagation();
-            e.preventDefault();
-            setIsResizing(true);
-            setResizeDirection('right');
-            dragStartX.current = e.clientX;
-            accumulatedDelta.current = 0;
+    const handleResizeStart = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setIsResizing(true);
+        setResizeDirection('right');
+        dragStartX.current = e.clientX;
+        accumulatedDelta.current = 0;
 
-            document.body.classList.add('resizing-active'); // Add class
-        }
+        document.body.classList.add('resizing-active'); // Add class
     };
-
 
     // Determine highlight color based on action type
     const highlightColor = editingTarget && editingTarget.highlightColor ? editingTarget.highlightColor : 'highlight-creating';
@@ -140,7 +114,6 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''} ${isResizing ? 'resizing' : ''}`}
             style={{
                 '--col-count': subUnits.length,
-                cursor: isHoveringRight ? 'col-resize' : 'pointer'
             }}
             // Clicking background selects the main unit
             onClick={(e) => {
@@ -149,10 +122,14 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 e.stopPropagation();
                 onClick(e, unit, null, null);
             }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => { setIsHoveringRight(false); }}
-            onMouseDown={handleMouseDown}
         >
+            {/* Explicit Resize Handle */}
+            <span
+                className="resize-handle"
+                onMouseDown={handleResizeStart}
+                onClick={(e) => e.stopPropagation()} // Prevent click propagation
+            />
+
             {/* --- Row 1: Tibetan Sub-Words (The "Main Word") --- */}
             {subUnits.map((u, i) => {
                 // Check if this sub-unit is just a tsheg

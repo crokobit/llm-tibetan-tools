@@ -1725,6 +1725,26 @@ body {
     cursor: not-allowed !important;
 }
 
+
+/* Resize Handle */
+.word-card-grid {
+    position: relative;
+}
+
+.resize-handle {
+    position: absolute;
+    right: -12px;
+    /* Sticks out to cover gap */
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    /* Wide hit area */
+    cursor: col-resize;
+    z-index: 50;
+    /* Ensure on top */
+    /* background-color: rgba(255, 0, 0, 0.1); /* Debug: visible handle */
+}
+
 /* Resize Styles */
 .word-card-grid.resizing {
     user-select: none;
