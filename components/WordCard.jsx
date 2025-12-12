@@ -6,12 +6,32 @@ import AnalysisLabel from './AnalysisLabel.jsx';
 
 // import { useSelection } from '../contexts/SelectionContext.jsx';
 
+// Helper to extract POS key for coloring
+// If "x->y" or "x→y", use "y". Otherwise use the first part.
+const getPosKey = (pos) => {
+    if (!pos) return 'other';
+    let p = pos.toLowerCase();
+
+    // Handle arrows (ascii -> or unicode →)
+    if (p.includes('->') || p.includes('→')) {
+        const parts = p.split(/->|→/);
+        if (parts.length > 1) {
+            p = parts[1];
+        }
+    }
+
+    // Clean up any remaining parens or delimiters
+    // e.g. if we had "(xxx)->y", we got "y".
+    // If we just had "n", we get "n".
+    return p.split(/[\->|]/)[0].replace(/[()]/g, '').trim() || 'other';
+};
+
 const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive, onResize, zIndex }) => {
     const { analysis, original, nestedData, supplementaryData } = unit;
     const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
     // const { getHighlightRange } = useSelection();
 
-    const mainPosKey = analysis.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
+    const mainPosKey = getPosKey(analysis.pos);
     const mainBorderColor = POS_COLORS[mainPosKey] || POS_COLORS.other;
     const displayDef = truncateDefinition(analysis.definition);
 
@@ -245,7 +265,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                         return <span key={`sub-${i}`} />;
                     }
 
-                    const subPosKey = u.analysis?.pos?.toLowerCase().split(/[\->|]/)[0] || 'other';
+                    const subPosKey = getPosKey(u.analysis?.pos);
                     const subBorderColor = POS_COLORS[subPosKey] || POS_COLORS.other;
                     const subBgColor = subBorderColor.replace('pos-border-', 'pos-bg-');
                     const subDef = truncateDefinition(u.analysis?.definition);

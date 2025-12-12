@@ -17,9 +17,30 @@ export default class AnalysisParser {
 
         if (match) {
             volls = match[1].trim();
-            pos = match[2];
-            tense = match[3] || '';
-            let rest = match[4].trim();
+            // Manually split content into POS and Tense, respecting parentheses
+            // logic: split by first comma that is NOT inside parentheses
+            const contentInner = match[2];
+            let splitIndex = -1;
+            let parenDepth = 0;
+
+            for (let i = 0; i < contentInner.length; i++) {
+                if (contentInner[i] === '(') parenDepth++;
+                else if (contentInner[i] === ')') parenDepth--;
+                else if (contentInner[i] === ',' && parenDepth === 0) {
+                    splitIndex = i;
+                    break;
+                }
+            }
+
+            if (splitIndex !== -1) {
+                pos = contentInner.substring(0, splitIndex).trim();
+                tense = contentInner.substring(splitIndex + 1).trim();
+            } else {
+                pos = contentInner.trim();
+                tense = '';
+            }
+
+            let rest = match[3].trim();
 
             // Attempt to separate Root from Definition
             // Assuming Root is Tibetan characters at the start
@@ -32,7 +53,7 @@ export default class AnalysisParser {
             }
         } else {
             // Fallback if regex doesn't match (e.g. no {})
-            definition = content.replace(/{[a-z0-9/\->|,]+}/i, '').trim();
+            definition = content.replace(/{[^}]+}/i, '').trim();
         }
 
         return { volls, pos, root, tense, definition };

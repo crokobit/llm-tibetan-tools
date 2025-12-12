@@ -8,5 +8,5 @@ export default class RegexGrammar {
 
     // Matches the internal analysis content: A{B1,Bh, B2}C D
     // A = volls (optional), { ... } = pos/tense, C D = root/definition
-    static ANALYSIS_CONTENT = /^(.*?){([a-z0-9/\->|]+)(?:,([^}]+))?}(.*)$/i;
+    static ANALYSIS_CONTENT = /^(.*?){([^}]+)}(.*)$/i;
 }
