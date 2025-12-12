@@ -194,6 +194,9 @@ exports.handler = async (event) => {
             console.timeEnd('OpenAI Generation');
         }
 
+        // Clean up responseText (remove markdown code blocks if present)
+        responseText = responseText.replace(/^```txt\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '');
+
         // Update Job with Result
         const command = new UpdateCommand({
             TableName: JOBS_TABLE_NAME,

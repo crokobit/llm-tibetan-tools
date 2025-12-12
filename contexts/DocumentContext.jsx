@@ -46,27 +46,9 @@ export function DocumentProvider({ children }) {
         }
     };
 
-    // Load default test file on mount
+    // Default file loading removed
     React.useEffect(() => {
-        const loadDefaultFile = async () => {
-            try {
-                setLoading(true);
-                const response = await fetch('test_plain_text.txt');
-                if (!response.ok) {
-                    throw new Error('Failed to load default file');
-                }
-                const text = await response.text();
-                setRawText(text);
-                const parsedData = DocumentParser.parse(text);
-                setDocumentData(parsedData);
-            } catch (error) {
-                console.error("Error loading default file:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadDefaultFile();
+        // No-op
     }, []);
 
     const value = {
@@ -96,7 +78,8 @@ export function DocumentProvider({ children }) {
                 const newData = [...prev];
                 newData.splice(afterIdx + 1, 0, {
                     type: 'tibetan',
-                    lines: [{ units: [{ type: 'text', original: '' }] }]
+                    _isInputMode: true,
+                    lines: []
                 });
                 return newData;
             });

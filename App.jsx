@@ -257,6 +257,84 @@ function TibetanReaderContent() {
         });
     };
 
+    const handleAnalyzeBlock = async (blockIdx, text) => {
+        setDocumentData(prev => {
+            const newData = [...prev];
+            newData[blockIdx] = { ...newData[blockIdx], _isAnalyzing: true };
+            return newData;
+        });
+
+        try {
+            // STEP 1: Start Analysis Job
+            let jobResponse;
+            try {
+                jobResponse = await analyzeText(token, text);
+            } catch (error) {
+                if (error.message === 'Unauthorized') {
+                    const newToken = await refreshSession();
+                    jobResponse = await analyzeText(newToken, text);
+                } else {
+                    throw error;
+                }
+            }
+
+            const { jobId } = jobResponse;
+            if (!jobId) throw new Error("No job ID returned");
+
+            showToast('Analysis started...');
+
+            // STEP 2: Poll for Result
+            const pollInterval = 2000;
+            const maxAttempts = 150;
+
+            for (let i = 0; i < maxAttempts; i++) {
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+                let jobStatus;
+                try {
+                    jobStatus = await import('./utils/api.js').then(m => m.getJob(token, jobId));
+                } catch (err) {
+                    if (err.message === 'Unauthorized') {
+                        const newToken = await refreshSession();
+                        jobStatus = await import('./utils/api.js').then(m => m.getJob(newToken, jobId));
+                    } else {
+                        throw err;
+                    }
+                }
+
+                if (jobStatus.status === 'COMPLETED') {
+                    const newBlocks = ResponseProcessor.process(jobStatus.result);
+
+                    setDocumentData(prev => {
+                        const newData = [...prev];
+                        // Replace the input block with the new analyzed blocks
+                        newData.splice(blockIdx, 1, ...newBlocks);
+                        return newData;
+                    });
+
+                    showToast('Analysis complete!');
+                    return;
+                } else if (jobStatus.status === 'FAILED') {
+                    throw new Error(jobStatus.error || "Job failed");
+                }
+            }
+            throw new Error("Analysis timed out");
+
+        } catch (error) {
+            console.error(error);
+            showToast('Analysis failed: ' + error.message);
+            // Reset analyzing state on error
+            setDocumentData(prev => {
+                const newData = [...prev];
+                // Check if block still exists and is input mode (it might have changed if user deleted everything, but unlikely)
+                if (newData[blockIdx]) {
+                    newData[blockIdx] = { ...newData[blockIdx], _isAnalyzing: false };
+                }
+                return newData;
+            });
+        }
+    };
+
     return (
         <div className="app-background" onClick={(e) => {
             // Don't close popup if clicking inside the popover
@@ -308,15 +386,6 @@ function TibetanReaderContent() {
                                 Export Text
                             </button>
                             {user && (
-                                <button
-                                    onClick={() => setShowAnalyzeModal(true)}
-                                    className="btn-export"
-                                    style={{ backgroundColor: '#8b5cf6' }}
-                                >
-                                    Analyze Text
-                                </button>
-                            )}
-                            {user && (
                                 <>
                                     <button
                                         onClick={() => saveFilename ? handleSaveCloud() : setShowSaveDialog(true)}
@@ -366,7 +435,11 @@ function TibetanReaderContent() {
                         <>
                             {documentData.length === 0 && (
                                 <div className="empty-state">
-                                    {/* Empty state content removed as requested */}
+                                    <div className="flex gap-4 p-8 justify-center">
+                                        <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-large bg-green-600 text-white px-6 py-3 rounded-lg shadow hover:bg-green-700 font-medium text-lg">+ Text</button>
+                                        <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-large bg-purple-600 text-white px-6 py-3 rounded-lg shadow hover:bg-purple-700 font-medium text-lg">+ Tibetan</button>
+                                        <button onClick={() => setShowDebug(!showDebug)} className={`btn-insert-large px-6 py-3 rounded-lg shadow font-medium text-lg ${showDebug ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Debug</button>
+                                    </div>
                                 </div>
                             )}
                             {documentData.map((block, blockIdx) => (
@@ -386,6 +459,8 @@ function TibetanReaderContent() {
                                             onUpdate={handleBlockUpdate}
                                             editingTarget={editingTarget}
                                             showDebug={showDebug || block._showDebug}
+                                            onAnalyze={handleAnalyzeBlock}
+                                            isAnalyzing={block._isAnalyzing}
                                         />
                                     )}
 
