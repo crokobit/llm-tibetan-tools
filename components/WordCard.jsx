@@ -6,7 +6,7 @@ import AnalysisLabel from './AnalysisLabel.jsx';
 
 // import { useSelection } from '../contexts/SelectionContext.jsx';
 
-const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive, onResize }) => {
+const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive, onResize, zIndex }) => {
     const { analysis, original, nestedData, supplementaryData } = unit;
     const [hoveredSubIndex, setHoveredSubIndex] = useState(null);
     // const { getHighlightRange } = useSelection();
@@ -114,6 +114,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
             className={`word-card-grid ${isEditingMainAnalysis ? 'editing-main' : ''} ${isResizing ? 'resizing' : ''}`}
             style={{
                 '--col-count': subUnits.length,
+                zIndex // Apply props zIndex
             }}
             // Clicking background selects the main unit
             onClick={(e) => {

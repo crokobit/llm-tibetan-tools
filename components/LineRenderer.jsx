@@ -16,6 +16,7 @@ const LineRenderer = ({ line, blockIdx, lineIdx, editingTarget, isAnyEditActive,
                     editingTarget={editingTarget}
                     isAnyEditActive={isAnyEditActive}
                     onResize={(direction) => onResize && onResize(lineIdx, unitIdx, direction)}
+                    zIndex={line.units.length - unitIdx} // Descending z-index for overlapping interaction
                 />
             ))}
         </div>

@@ -5,7 +5,7 @@ import { FONT_SIZES } from '../utils/constants.js';
 
 import { useSelection } from '../contexts/SelectionContext.jsx';
 
-const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEditActive, onResize }) => {
+const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEditActive, onResize, zIndex }) => {
     const { getHighlightRange } = useSelection();
 
     if (unit.type === 'text') {
@@ -42,12 +42,13 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
                 className={`tibetan-unit-container tibetan-word-box`}
                 data-indices={indices ? JSON.stringify(indices) : undefined}
                 onClick={(e) => e.stopPropagation()}
+                style={{ position: 'relative', zIndex }}
             ><span className={`tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan}`}>
                     {content}
                 </span></span>
         );
     }
-    return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} isAnyEditActive={isAnyEditActive} onResize={onResize} />;
+    return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} isAnyEditActive={isAnyEditActive} onResize={onResize} zIndex={zIndex} />;
 };
 
 export default UnitRenderer;
