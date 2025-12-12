@@ -6,6 +6,7 @@ import AnalysisParser from './logic/AnalysisParser.js';
 import ResponseProcessor from './logic/ResponseProcessor.js';
 import EditPopover from './components/EditPopover.jsx';
 import AnalyzeModal from './components/AnalyzeModal.jsx';
+import PasteModal from './components/PasteModal.jsx';
 import RichTextBlock from './components/RichTextBlock.jsx';
 import TibetanBlock from './components/TibetanBlock.jsx';
 
@@ -23,6 +24,7 @@ function TibetanReaderContent() {
     const [isLoadingFiles, setIsLoadingFiles] = useState(false);
     const [isLoadingFile, setIsLoadingFile] = useState(false);
     const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
+    const [showPasteModal, setShowPasteModal] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [notification, setNotification] = useState(null);
     const contentRef = useRef(null);
@@ -240,6 +242,22 @@ function TibetanReaderContent() {
         }
     };
 
+    const handlePasteAnalyzed = (text) => {
+        try {
+            const newBlocks = ResponseProcessor.process(text);
+            if (newBlocks.length === 0) {
+                showToast('No valid blocks found in text.');
+                return;
+            }
+            setDocumentData(prev => [...prev, ...newBlocks]);
+            setShowPasteModal(false);
+            showToast('Text imported successfully!');
+        } catch (error) {
+            console.error(error);
+            showToast('Failed to parse text: ' + error.message);
+        }
+    };
+
     const handleBlockUpdate = (blockIdx, newBlock) => {
         setDocumentData(prev => {
             const newData = [...prev];
@@ -416,7 +434,10 @@ function TibetanReaderContent() {
                                     <input
                                         type="checkbox"
                                         checked={showDebug}
-                                        onChange={(e) => setShowDebug(e.target.checked)}
+                                        onChange={(e) => {
+                                            setShowDebug(e.target.checked);
+                                            setDocumentData(prev => prev.map(b => ({ ...b, _showDebug: false })));
+                                        }}
                                     />
                                     Debug Mode
                                 </label>
@@ -436,9 +457,8 @@ function TibetanReaderContent() {
                             {documentData.length === 0 && (
                                 <div className="empty-state">
                                     <div className="flex gap-4 p-8 justify-center">
-                                        <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-large bg-green-600 text-white px-6 py-3 rounded-lg shadow hover:bg-green-700 font-medium text-lg">+ Text</button>
+                                        <button onClick={() => setShowPasteModal(true)} className="btn-insert-large bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 font-medium text-lg">Add analyzed text</button>
                                         <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-large bg-purple-600 text-white px-6 py-3 rounded-lg shadow hover:bg-purple-700 font-medium text-lg">+ Tibetan</button>
-                                        <button onClick={() => setShowDebug(!showDebug)} className={`btn-insert-large px-6 py-3 rounded-lg shadow font-medium text-lg ${showDebug ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Debug</button>
                                     </div>
                                 </div>
                             )}
@@ -494,6 +514,13 @@ function TibetanReaderContent() {
                 onClose={() => setShowAnalyzeModal(false)}
                 onAnalyze={handleAnalyze}
                 isAnalyzing={isAnalyzing}
+            />
+
+            {/* Paste Modal */}
+            <PasteModal
+                isOpen={showPasteModal}
+                onClose={() => setShowPasteModal(false)}
+                onImport={handlePasteAnalyzed}
             />
 
             {/* Save Dialog */}

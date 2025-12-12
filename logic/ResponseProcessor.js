@@ -24,11 +24,7 @@ export default class ResponseProcessor {
                 _showDebug: true // Show debug by default for new analysis
             });
 
-            blocks.push({
-                type: 'tibetan',
-                lines: lines,
-                _showDebug: true // Show debug by default for new analysis
-            });
+
         }
 
         return blocks;
