@@ -1761,3 +1761,44 @@ body.resizing-active {
     cursor: col-resize !important;
     user-select: none;
 }
+/* Context Menu for Resizing */
+.context-menu-popup {
+    position: fixed;
+    z-index: 1000;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    padding: 0.25rem 0;
+    min-width: 120px;
+}
+
+.context-menu-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: #374151;
+    cursor: pointer;
+    transition: background-color 150ms;
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+}
+
+.context-menu-item:hover {
+    background-color: #f3f4f6;
+}
+
+/* Resize Mode Active State - applied to word-card-grid */
+.word-card-grid.resize-mode-active {
+    box-shadow: 0 0 0 2px #8b5cf6 !important; /* Purple ring to indicate special mode */
+    cursor: col-resize !important;
+    position: relative; /* Ensure it catches events */
+}
+
+/* When in resize mode, override cursor for children to ensure drag feel */
+.word-card-grid.resize-mode-active * {
+    cursor: col-resize !important;
+    user-select: none !important; /* Prevent text selection during resize mode */
+}
