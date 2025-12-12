@@ -83,6 +83,9 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
     }, [isResizing, handleGlobalMouseMove, handleGlobalMouseUp]);
 
     const handleResizeStart = (e) => {
+        // Only allow left mouse button
+        if (e.button !== 0) return;
+
         e.stopPropagation();
         e.preventDefault();
         setIsResizing(true);
@@ -124,12 +127,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                 onClick(e, unit, null, null);
             }}
         >
-            {/* Explicit Resize Handle */}
-            <span
-                className="resize-handle"
-                onMouseDown={handleResizeStart}
-                onClick={(e) => e.stopPropagation()} // Prevent click propagation
-            />
+
 
             {/* --- Row 1: Tibetan Sub-Words (The "Main Word") --- */}
             {subUnits.map((u, i) => {
@@ -273,6 +271,13 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                     </span>
                 );
             })}
+
+            {/* Explicit Resize Handle - Rendered last to stay on top */}
+            <span
+                className="resize-handle"
+                onMouseDown={handleResizeStart}
+                onClick={(e) => e.stopPropagation()}
+            />
         </span>
     );
 };
