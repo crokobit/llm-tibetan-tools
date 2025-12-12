@@ -269,7 +269,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                                 const selection = window.getSelection();
                                 if (selection && !selection.isCollapsed) return;
                                 e.stopPropagation();
-                                onClick(e, unit, null, null);
+                                onClick(e, u, i, subType);
                             }}
                         >
                             {/* Sub Analysis Underline (Colored Bar) */}
