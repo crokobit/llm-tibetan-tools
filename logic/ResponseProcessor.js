@@ -1,5 +1,5 @@
 import RegexGrammar from './RegexGrammar.js';
-import RegexGrammar from './RegexGrammar.js';
+
 import AnalysisParser from './AnalysisParser.js';
 import DocumentParser from './DocumentParser.js';
 
