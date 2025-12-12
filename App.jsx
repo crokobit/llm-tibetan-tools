@@ -22,7 +22,7 @@ function TibetanReaderContent() {
     const [saveFilename, setSaveFilename] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingFiles, setIsLoadingFiles] = useState(false);
-    const [isLoadingFile, setIsLoadingFile] = useState(false);
+    const [isLoadingFile, setIsLoadingFile] = useState(null);
     const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
     const [showPasteModal, setShowPasteModal] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -30,7 +30,7 @@ function TibetanReaderContent() {
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
-    const isApiBusy = isSaving || isLoadingFiles || isLoadingFile;
+    const isApiBusy = isSaving || isLoadingFiles || !!isLoadingFile;
 
     // Load mammoth.js library
     useEffect(() => {
@@ -140,7 +140,7 @@ function TibetanReaderContent() {
     };
 
     const loadFile = async (filename) => {
-        setIsLoadingFile(true);
+        setIsLoadingFile(filename);
         try {
             const response = await getFile(token, filename);
             // Expecting response to be { content: "stringified_json" }
@@ -173,7 +173,7 @@ function TibetanReaderContent() {
                 showToast('Failed to load file.');
             }
         } finally {
-            setIsLoadingFile(false);
+            setIsLoadingFile(null);
         }
     };
 
@@ -554,7 +554,7 @@ function TibetanReaderContent() {
                         <ul className="file-list">
                             {userFiles.map(file => (
                                 <li key={file.filename} onClick={() => !isApiBusy && loadFile(file.filename)} className={`file-item ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    {file.filename} {isLoadingFile && '(Loading...)'}
+                                    {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
                                 </li>
                             ))}
                         </ul>
