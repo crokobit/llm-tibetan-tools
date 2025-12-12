@@ -52,6 +52,9 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
             // Check if there is a next unit to take from
             if (!nextUnit) return;
 
+            // Prevent overlapping with other ANALYSIS units
+            if (nextUnit.type !== 'text') return;
+
             // Determine chars to move
             let charsToMove = '';
 
@@ -157,11 +160,11 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
             charsToMove = char1;
             charsToKeep = unit.original.slice(0, -1);
 
-            // Checks if NEW end is tsheg
-            if (charsToKeep.endsWith('་') && charsToKeep.length > 0) {
+            // Loop to remove trailing tshegs or spaces
+            while ((charsToKeep.endsWith('་') || /^\s$/.test(charsToKeep.slice(-1))) && charsToKeep.length > 0) {
                 // Remove one more!
-                let char2 = charsToKeep.slice(-1);
-                charsToMove = char2 + charsToMove;
+                let charToRemove = charsToKeep.slice(-1);
+                charsToMove = charToRemove + charsToMove;
                 charsToKeep = charsToKeep.slice(0, -1);
             }
 
@@ -194,17 +197,16 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                 nextUnit.original = charsToMove + nextUnit.original;
             } else if (nextUnit && nextUnit.type !== 'text') {
                 // Prepend to next analyzed unit
-                nextUnit.original = charsToMove + nextUnit.original;
+                // USER REQUEST: Forbid overlapping/merging with analysis units.
+                // Fall through to create new text unit instead.
 
-                // Prepend to first nested of next unit
-                // We need to add to the first nested unit. If it doesn't exist?
-                let firstNested = getFirstNestedUnit(nextUnit);
-                if (!firstNested) {
-                    // Create one? Or if missing just ignore?
-                    // If nextUnit is analyzed, it should have nested/supplementary or we treat original.
-                } else {
-                    firstNested.original = charsToMove + firstNested.original;
-                }
+                // Create new text unit (Duplicate logic as below, or just break/modify condition)
+                const newTextUnit = {
+                    type: 'text',
+                    original: charsToMove
+                };
+                line.units.splice(unitIdx + 1, 0, newTextUnit);
+
             } else {
                 // Create new text unit
                 const newTextUnit = {
