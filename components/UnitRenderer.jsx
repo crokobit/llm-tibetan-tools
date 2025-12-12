@@ -5,7 +5,7 @@ import { FONT_SIZES } from '../utils/constants.js';
 
 import { useSelection } from '../contexts/SelectionContext.jsx';
 
-const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEditActive }) => {
+const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEditActive, onResize }) => {
     const { getHighlightRange } = useSelection();
 
     if (unit.type === 'text') {
@@ -47,7 +47,7 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
                 </span></span>
         );
     }
-    return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} isAnyEditActive={isAnyEditActive} />;
+    return <WordCard unit={unit} onClick={onClick} isNested={isNested} indices={indices} editingTarget={editingTarget} isAnyEditActive={isAnyEditActive} onResize={onResize} />;
 };
 
 export default UnitRenderer;
