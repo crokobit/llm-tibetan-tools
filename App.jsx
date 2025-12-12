@@ -250,6 +250,7 @@ function TibetanReaderContent() {
                 return;
             }
             setDocumentData(prev => [...prev, ...newBlocks]);
+            setShowDebug(false);
             setShowPasteModal(false);
             showToast('Text imported successfully!');
         } catch (error) {
