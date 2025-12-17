@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProviders, useDocument, useEdit, useSelection, useAuth } from './contexts/index.jsx';
-import { saveFile, listFiles, getFile, analyzeText, deleteFile } from './utils/api.js';
+import { saveFile, listFiles, getFile, analyzeText, deleteFile, renameFile } from './utils/api.js';
 import AnalysisParser from './logic/AnalysisParser.js';
 import ResponseProcessor from './logic/ResponseProcessor.js';
 import EditPopover from './components/EditPopover.jsx';
@@ -182,6 +182,69 @@ function TibetanReaderContent() {
             setIsSaving(false);
         }
     };
+    const [showRenameDialog, setShowRenameDialog] = useState(false);
+    const [renameFilename, setRenameFilename] = useState('');
+    const [renameNewFilename, setRenameNewFilename] = useState('');
+
+
+    const handleRenameCloud = async () => {
+        if (!renameFilename || !renameNewFilename) return;
+        if (renameFilename === renameNewFilename) {
+            setShowRenameDialog(false);
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await renameFile(token, renameFilename, renameNewFilename);
+            showToast('File renamed successfully');
+            setShowRenameDialog(false);
+
+            // Update userFiles list
+            setUserFiles(prev => prev.map(f => f.filename === renameFilename ? { ...f, filename: renameNewFilename } : f));
+
+            // If current file was renamed, update saveFilename
+            if (saveFilename === renameFilename) {
+                setSaveFilename(renameNewFilename);
+            }
+
+            // If we are in file list mode, refresh list just in case (optional, but good for consistency)
+            if (showFileList) {
+                const files = await listFiles(token);
+                setUserFiles(files);
+            }
+
+        } catch (error) {
+            console.error(error);
+            if (error.message === 'Unauthorized') {
+                try {
+                    const newToken = await refreshSession();
+                    await renameFile(newToken, renameFilename, renameNewFilename);
+                    showToast('File renamed successfully');
+                    setShowRenameDialog(false);
+                    // Update userFiles list
+                    setUserFiles(prev => prev.map(f => f.filename === renameFilename ? { ...f, filename: renameNewFilename } : f));
+
+                    if (saveFilename === renameFilename) {
+                        setSaveFilename(renameNewFilename);
+                    }
+                    if (showFileList) {
+                        const files = await listFiles(newToken);
+                        setUserFiles(files);
+                    }
+
+                } catch (refreshError) {
+                    showToast('Session expired. Please login again.');
+                    logout();
+                }
+            } else {
+                showToast('Failed to rename file: ' + error.message);
+            }
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
 
 
     const loadFile = async (filename) => {
@@ -482,6 +545,20 @@ function TibetanReaderContent() {
                                     </button>
                                     {saveFilename && (
                                         <button
+                                            onClick={() => {
+                                                setRenameFilename(saveFilename);
+                                                setRenameNewFilename(saveFilename);
+                                                setShowRenameDialog(true);
+                                            }}
+                                            className="btn-export"
+                                            disabled={isApiBusy}
+                                            style={{ marginLeft: '10px' }}
+                                        >
+                                            Rename
+                                        </button>
+                                    )}
+                                    {saveFilename && (
+                                        <button
                                             onClick={() => handleDeleteCloud(saveFilename)}
                                             className={`btn-export bg-red-600 hover:bg-red-700 ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             disabled={isApiBusy}
@@ -611,6 +688,7 @@ function TibetanReaderContent() {
                 </div>
             )}
 
+
             {/* File List Dialog */}
             {showFileList && (
                 <div className="modal-overlay">
@@ -622,21 +700,58 @@ function TibetanReaderContent() {
                                     <span onClick={() => !isApiBusy && loadFile(file.filename)} style={{ flexGrow: 1, cursor: 'pointer' }}>
                                         {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
                                     </span>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteCloud(file.filename);
-                                        }}
-                                        className="btn-delete-small"
-                                        style={{ marginLeft: '10px', padding: '2px 8px', fontSize: '0.8rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                                        disabled={isApiBusy}
-                                    >
-                                        Delete
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setRenameFilename(file.filename);
+                                                setRenameNewFilename(file.filename);
+                                                setShowRenameDialog(true);
+                                            }}
+                                            className="btn-export"
+                                            style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                                            disabled={isApiBusy}
+                                        >
+                                            Rename
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteCloud(file.filename);
+                                            }}
+                                            className="btn-delete-small"
+                                            style={{ padding: '2px 8px', fontSize: '0.8rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                            disabled={isApiBusy}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
                         <button onClick={() => setShowFileList(false)} className="btn-cancel">Close</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Rename Dialog */}
+            {showRenameDialog && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Rename File</h3>
+                        <input
+                            type="text"
+                            value={renameNewFilename}
+                            onChange={(e) => setRenameNewFilename(e.target.value)}
+                            placeholder="Enter new filename"
+                            className="modal-input"
+                        />
+                        <div className="modal-actions">
+                            <button onClick={() => setShowRenameDialog(false)} className="btn-cancel" disabled={isApiBusy}>Cancel</button>
+                            <button onClick={handleRenameCloud} className="btn-confirm" disabled={isApiBusy}>
+                                {isSaving ? 'Renaming...' : 'Rename'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

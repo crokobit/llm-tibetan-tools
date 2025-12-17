@@ -105,6 +105,15 @@ class TibetanToolsStack extends Stack {
         table.grantWriteData(deleteFileFunction);
         bucket.grantDelete(deleteFileFunction);
 
+        // Rename File Function
+        const renameFileFunction = new lambda.Function(this, 'RenameFileFunction', {
+            ...commonProps,
+            handler: 'rename_file.handler',
+        });
+        table.grantWriteData(renameFileFunction); // Needs to put new item and update old one
+        table.grantReadData(renameFileFunction);  // Check if exist
+        bucket.grantReadWrite(renameFileFunction); // Copy object
+
         // Jobs Table
         const jobsTable = new dynamodb.Table(this, 'TibetanToolsJobs', {
             partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
@@ -199,6 +208,12 @@ class TibetanToolsStack extends Stack {
             path: '/delete',
             methods: [apigw.HttpMethod.DELETE],
             integration: new HttpLambdaIntegration('DeleteFileIntegration', deleteFileFunction),
+        });
+
+        httpApi.addRoutes({
+            path: '/rename',
+            methods: [apigw.HttpMethod.POST],
+            integration: new HttpLambdaIntegration('RenameFileIntegration', renameFileFunction),
         });
 
         httpApi.addRoutes({

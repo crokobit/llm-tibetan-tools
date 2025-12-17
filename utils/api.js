@@ -118,3 +118,25 @@ export const deleteFile = async (token, filename) => {
 
     return response.json();
 };
+
+export const renameFile = async (token, filename, newFilename) => {
+    const response = await fetch(`${API_BASE_URL}/rename`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ filename, newFilename })
+    });
+
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to rename file');
+    }
+
+    return response.json();
+};

@@ -1,14 +1,11 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
-const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { DynamoDBDocumentClient, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const { verifyToken } = require('./auth');
 
 const ddbClient = new DynamoDBClient({});
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
-const s3Client = new S3Client({});
 
 const TABLE_NAME = process.env.TABLE_NAME;
-const BUCKET_NAME = process.env.BUCKET_NAME;
 
 exports.handler = async (event) => {
     try {
@@ -35,18 +32,16 @@ exports.handler = async (event) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'Missing filename' }) };
         }
 
-        // Delete from S3
-        await s3Client.send(new DeleteObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: `${userId}/${filename}`,
-        }));
-
-        // Delete from DynamoDB
-        await ddbDocClient.send(new DeleteCommand({
+        // Soft Delete in DynamoDB (mark as deleted)
+        await ddbDocClient.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: {
                 userId: userId,
                 filename: filename
+            },
+            UpdateExpression: "set isDeleted = :true",
+            ExpressionAttributeValues: {
+                ":true": true
             }
         }));
 

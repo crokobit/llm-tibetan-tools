@@ -29,8 +29,10 @@ exports.handler = async (event) => {
         const command = new QueryCommand({
             TableName: TABLE_NAME,
             KeyConditionExpression: 'userId = :uid',
+            FilterExpression: 'attribute_not_exists(isDeleted) OR isDeleted = :false',
             ExpressionAttributeValues: {
-                ':uid': userId
+                ':uid': userId,
+                ':false': false
             }
         });
 
