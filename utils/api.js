@@ -140,3 +140,25 @@ export const renameFile = async (token, filename, newFilename) => {
 
     return response.json();
 };
+
+export const disambiguateVerbs = async (token, text, items) => {
+    const response = await fetch(`${API_BASE_URL}/disambiguate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text, items })
+    });
+
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to disambiguate verbs');
+    }
+
+    return response.json();
+};

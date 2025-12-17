@@ -1,5 +1,7 @@
 import RegexGrammar from './RegexGrammar.js';
 
+import { enrichAnalysis } from '../utils/verbLookup.js';
+
 export default class AnalysisParser {
     static parse(annotationString) {
         let content = annotationString;
@@ -56,13 +58,36 @@ export default class AnalysisParser {
             definition = content.replace(/{[^}]+}/i, '').trim();
         }
 
-        return { volls, pos, root, tense, definition };
+        let analysis = { volls, pos, root, tense, definition };
+
+        // Auto-fill verb info if missing or to enhance
+        // We use the root for lookup
+        if (root) {
+            analysis = enrichAnalysis(analysis, root);
+        }
+
+        return analysis;
     }
 
     static serialize(analysisObj, originalWord) {
         const { volls, root, pos, tense, definition } = analysisObj;
 
-        const bString = `${pos || 'other'}${tense ? ',' + tense : ''}`;
+        // Clean POS string to ensure we don't duplicate tense
+        let finalPos = pos || 'other';
+        const finalTense = tense ? tense.toLowerCase() : '';
+
+        // If tense exists, check if it's already in the POS string
+        // POS formats: "v", "v,imp", "v|imp", "v,hon,imp"
+        // Tense formats: "past", "imp", "future"
+        if (finalTense) {
+            const parts = finalPos.split(/[,|]/).map(p => p.trim().toLowerCase());
+            if (!parts.includes(finalTense)) {
+                // Not present, so append it
+                finalPos = `${finalPos},${finalTense}`;
+            }
+        }
+
+        const bString = finalPos;
         const c_and_d = `${root || ''} ${definition || ''}`.trim();
 
         let internalString = '';

@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import LineRenderer from './LineRenderer.jsx';
 import DebugBlockEditor from './DebugBlockEditor.jsx';
+import { useAuth } from '../contexts/index.jsx';
+import { disambiguateVerbs } from '../utils/api.js';
+import { enrichAnalysis, lookupVerb } from '../utils/verbLookup.js'; // Added imports
 
 export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing }) {
     const [inputText, setInputText] = React.useState('');
+    const [isResolving, setIsResolving] = useState(false);
+    const { token } = useAuth();
 
     if (block._isInputMode) {
         return (
@@ -27,6 +32,163 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
             </div>
         );
     }
+
+    // --- Resolve Verbs Logic ---
+    const getVerbsToPolish = () => {
+        const verbs = [];
+        block.lines.forEach((line, lineIdx) => {
+            line.units.forEach((unit, unitIdx) => {
+                let details = unit.analysis?.verbDetails;
+
+                // Legacy Data Support: If details are missing, try dynamic lookup
+                if (!details || details.length === 0) {
+                    if (unit.analysis && (unit.analysis.root || unit.original)) {
+                        const matches = lookupVerb(unit.analysis.root || unit.original);
+                        if (matches && matches.length > 0) {
+                            details = matches; // Found it!
+                        }
+                    }
+                }
+
+                if (details && details.length > 0) {
+                    // Check if already polished AND is a verb (v, vd, vnd)
+                    const posStr = unit.analysis.pos || '';
+                    const posType = posStr.split(',')[0].split('|')[0]; // Extract primary POS type
+                    const isVerb = ['v', 'vd', 'vnd'].includes(posType);
+
+                    if (!unit.analysis.isPolished && isVerb) {
+                        verbs.push({ lineIdx, unitIdx, unit, dynamicDetails: details });
+                    }
+                }
+            });
+        });
+        return verbs;
+    };
+
+    const handleResolveVerbs = async () => {
+        const targets = getVerbsToPolish();
+        if (targets.length === 0) return;
+
+        setIsResolving(true);
+        try {
+            // Split into Ambiguous and Unambiguous
+            const ambiguous = [];
+            const unambiguous = [];
+            const newBlock = JSON.parse(JSON.stringify(block));
+            let updateCount = 0;
+
+            targets.forEach(t => {
+                const details = t.dynamicDetails || t.unit.analysis.verbDetails;
+                if (details.length === 1) unambiguous.push({ ...t, details });
+                else ambiguous.push({ ...t, details });
+            });
+
+            // 1. Handle Unambiguous (Auto-Apply)
+            unambiguous.forEach(t => {
+                const { lineIdx, unitIdx, details } = t;
+                const unit = newBlock.lines[lineIdx].units[unitIdx];
+
+                // Ensure details are saved to unit if they were dynamic
+                unit.analysis.verbDetails = details;
+
+                const option = details[0];
+
+                // Update and Mark Polished
+                // unit.analysis.definition = option.definition; // Stop overwriting definition
+                unit.analysis.root = option.original_word;
+
+                // Map Tense: Present (default, usually empty), Past->past, Future->future, Imperative->imp
+                // System uses: past, imp, future
+                let tenseVal = '';
+                if (option.tense === 'Past') tenseVal = 'past';
+                else if (option.tense === 'Future') tenseVal = 'future';
+                else if (option.tense === 'Imperative') tenseVal = 'imp';
+
+                unit.analysis.tense = tenseVal;
+                unit.analysis.hon = option.hon;
+                unit.analysis.isPolished = true;
+                updateCount++;
+            });
+
+            // 2. Handle Ambiguous (LLM)
+            if (ambiguous.length > 0) {
+                // Construct Full Text Context
+                let fullText = '';
+                const itemMap = [];
+
+                block.lines.forEach((line, lIdx) => {
+                    line.units.forEach((unit, uIdx) => {
+                        const currentText = unit.original;
+                        const targetIdx = ambiguous.findIndex(t => t.lineIdx === lIdx && t.unitIdx === uIdx);
+
+                        if (targetIdx !== -1) {
+                            const target = ambiguous[targetIdx];
+                            const offset = fullText.length;
+
+                            // Ensure details are saved to unit if they were dynamic (in itemMap ref)
+                            // We don't modify 'unit' here directly, but the target ref
+
+                            itemMap.push({
+                                id: `target-${lIdx}-${uIdx}`,
+                                indexInText: offset,
+                                original: currentText,
+                                verbOptions: target.details,
+                                lineIdx: lIdx,
+                                unitIdx: uIdx
+                            });
+                        }
+                        fullText += currentText;
+                    });
+                    fullText += '\\n';
+                });
+
+                const result = await disambiguateVerbs(token, fullText, itemMap);
+
+                if (result && result.results) {
+                    result.results.forEach(res => {
+                        const item = itemMap.find(i => i.id === res.id);
+                        if (item) {
+                            const { lineIdx, unitIdx, verbOptions } = item;
+                            const unit = newBlock.lines[lineIdx].units[unitIdx];
+
+                            // Save details to stored unit
+                            unit.analysis.verbDetails = verbOptions;
+
+                            const selectedOption = verbOptions[res.selectedIndex];
+
+                            if (selectedOption) {
+                                // unit.analysis.definition = selectedOption.definition; // Stop overwriting definition
+                                unit.analysis.root = selectedOption.original_word;
+
+                                // Map Tense
+                                let tenseVal = '';
+                                if (selectedOption.tense === 'Past') tenseVal = 'past';
+                                else if (selectedOption.tense === 'Future') tenseVal = 'future';
+                                else if (selectedOption.tense === 'Imperative') tenseVal = 'imp';
+
+                                unit.analysis.tense = tenseVal;
+                                unit.analysis.hon = selectedOption.hon;
+                                unit.analysis.isPolished = true;
+                                updateCount++;
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (updateCount > 0) {
+                onUpdate(blockIdx, newBlock);
+            }
+
+        } catch (error) {
+            console.error("Failed to resolve verbs:", error);
+            alert(`Polsihing Failed: ${error.message}. Please check if the backend is deployed and API keys are set.`);
+        } finally {
+            setIsResolving(false);
+        }
+    };
+
+    const verbsToPolishCount = getVerbsToPolish().length;
 
     const handleResize = (lineIdx, unitIdx, direction) => {
         // Create a deep copy of the block to modify
@@ -222,6 +384,27 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
 
     return (
         <div className="block-layout">
+            {/* Block Toolbar */}
+            {!block._isInputMode && verbsToPolishCount > 0 && (
+                <div className="flex justify-end mb-2 px-2">
+                    <button
+                        onClick={handleResolveVerbs}
+                        disabled={isResolving}
+                        className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded hover:bg-indigo-200 transition-colors flex items-center gap-2"
+                        title={`Found ${verbsToPolishCount} verbs to polish`}
+                    >
+                        {isResolving ? (
+                            <>
+                                <span className="animate-spin text-lg">⟳</span> Polishing...
+                            </>
+                        ) : (
+                            <>
+                                <span>✨</span> Polish Verbs (AI) ({verbsToPolishCount})
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
 
             {block.lines.map((line, lineIdx) => (
                 <LineRenderer

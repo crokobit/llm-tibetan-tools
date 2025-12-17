@@ -1620,6 +1620,50 @@ body {
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
+.verb-selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.btn-ai-detect {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+    margin-right: 8px;
+}
+
+.btn-verify {
+    background: transparent;
+    border: 1px solid #d1d5db;
+    color: #6b7280;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-verify:hover {
+    background: #f3f4f6;
+}
+
+.btn-verify.verified {
+    background: #d1fae5;
+    color: #059669;
+    border-color: #34d399;
+}
+
 .modal-content h3 {
     margin-top: 0;
     margin-bottom: 1.5rem;
@@ -1761,6 +1805,7 @@ body.resizing-active {
     cursor: col-resize !important;
     user-select: none;
 }
+
 /* Context Menu for Resizing */
 .context-menu-popup {
     position: fixed;
@@ -1792,15 +1837,18 @@ body.resizing-active {
 
 /* Resize Mode Active State - applied to word-card-grid */
 .word-card-grid.resize-mode-active {
-    box-shadow: 0 0 0 2px #8b5cf6 !important; /* Purple ring to indicate special mode */
+    box-shadow: 0 0 0 2px #8b5cf6 !important;
+    /* Purple ring to indicate special mode */
     cursor: col-resize !important;
-    position: relative; /* Ensure it catches events */
+    position: relative;
+    /* Ensure it catches events */
 }
 
 /* When in resize mode, override cursor for children to ensure drag feel */
 .word-card-grid.resize-mode-active * {
     cursor: col-resize !important;
-    user-select: none !important; /* Prevent text selection during resize mode */
+    user-select: none !important;
+    /* Prevent text selection during resize mode */
 }
 
 /* Refactoring Additions */
@@ -1887,10 +1935,7 @@ body.resizing-active {
     cursor: not-allowed;
 }
 
-.btn-delete-small {
-     /* Replaces bg-red-600 hover:bg-red-700 from App.jsx if used there, but also defined in styles.css already? */
-     /* Actually .btn-delete-small was used with style override in App.jsx. Let's make it consistent. */
-}
+/* .btn-delete-small was intended for override but is currently unused or defined elsewhere */
 
 .modal-content-large {
     width: 600px;

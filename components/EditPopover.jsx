@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useEdit } from '../contexts/index.jsx';
+import { useEdit, useAuth, useDocument } from '../contexts/index.jsx';
+import { disambiguateVerbs } from '../utils/api.js';
+import { lookupVerb } from '../utils/verbLookup.js'; // Import lookup logic
 
 // POS types with English abbreviations only
 const POS_TYPES = [
@@ -28,6 +30,8 @@ const TENSE_OPTIONS = [
 
 const EditPopover = () => {
     const { editingTarget, anchorRect, handleSaveEdit, handleDeleteAnalysis, handleCloseEdit } = useEdit();
+    const { token } = useAuth();
+    const { documentData } = useDocument();
 
     const isOpen = !!editingTarget;
     const data = editingTarget ? editingTarget.unit : null;
@@ -49,6 +53,10 @@ const EditPopover = () => {
     const popoverRef = useRef(null);
     const [coords, setCoords] = useState({ top: 0, left: 0, opacity: 0 });
     const [placement, setPlacement] = useState('bottom');
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    // Dynamic hydration of verb details for legacy data
+    const [dynamicVerbDetails, setDynamicVerbDetails] = useState(null);
+    const [showDefinitions, setShowDefinitions] = useState(false); // Toggle for verb list definitions
 
     // Parse existing POS string into builder state
     const parsePosString = (posStr) => {
@@ -198,6 +206,24 @@ const EditPopover = () => {
             setOperator(parsed.op);
             setEndNode(parsed.end);
             setEndAttrs(parsed.endAttrs);
+
+            // SYNC FIX: If metadata exists (e.g. from Smart Polish), override the parsed attributes
+            // strictly for simple cases (single start node, no operator)
+            if (data.analysis.isPolished && parsed.op === 'single' && parsed.start.length === 1) {
+                const nodeType = parsed.start[0];
+                if (['v', 'vd', 'vnd'].includes(nodeType)) {
+                    const metadataAttrs = { hon: false, tense: [] };
+                    if (data.analysis.hon) metadataAttrs.hon = true;
+                    if (data.analysis.tense) {
+                        // System uses: past, imp, future
+                        // Ensure it's an array for the state
+                        const tSet = new Set(parsed.startAttrs.tense); // Start with existing
+                        tSet.add(data.analysis.tense);
+                        metadataAttrs.tense = Array.from(tSet);
+                    }
+                    setStartAttrs(metadataAttrs);
+                }
+            }
         }
     }, [data, isCreating, possibleParents, editingTarget]);
 
@@ -255,6 +281,194 @@ const EditPopover = () => {
         }
     }, [isOpen, handleCloseEdit]);
 
+    // Toggle Verified Status
+    const toggleVerified = () => {
+        handleSaveEdit({
+            ...formData,
+            pos: getPreviewText(), // Ensure POS is up to date
+            tense: '',
+            isPolished: !data?.analysis?.isPolished
+        }, parentMode);
+    };
+
+    // Apply Verb Option
+    const applyVerbOption = (option) => {
+        // 1. Definition - DO NOT Overwrite, but maybe set root
+        setFormData(prev => ({ ...prev, root: option.original_word }));
+
+        // 2. POS/Tense
+        setStartNode(['v']);
+
+        // Map Tense: Correct system values are: past, imp, future
+        const tenses = [];
+        if (option.tense === 'Past') tenses.push('past');
+        if (option.tense === 'Future') tenses.push('future');
+        if (option.tense === 'Imperative') tenses.push('imp');
+        // Present corresponds to no tense suffix usually, so empty array is correct.
+
+        const newStartAttrs = {
+            hon: option.hon || false,
+            tense: tenses
+        };
+        setStartAttrs(newStartAttrs);
+
+        // Volition
+        if (option.volition === 'vd') setStartNode(['vd']);
+        else if (option.volition === 'vnd') setStartNode(['vnd']);
+        else setStartNode(['v']);
+
+        // AUTO-SAVE with Polished Status
+        // We construct the POS string immediately to save
+        const posStr = formatNodeText(option.volition === 'vd' ? ['vd'] : (option.volition === 'vnd' ? ['vnd'] : ['v']), newStartAttrs);
+
+        // Map primary tense for metadata (take first one)
+        const tenseMeta = tenses.length > 0 ? tenses[0] : '';
+
+        // Preserve existing definition in formData
+        handleSaveEdit({
+            ...formData,
+            root: option.original_word,
+            pos: posStr,
+            tense: tenseMeta, // FIX: Pass tense to metadata
+            isPolished: true // Mark as polished when manually selected
+        }, parentMode);
+    };
+
+    // Helper to get effective verb details
+    const getVerbDetails = () => {
+        // 1. Prefer existing details from analysis
+        if (data?.analysis?.verbDetails && data.analysis.verbDetails.length > 0) {
+            return data.analysis.verbDetails;
+        }
+
+        // 2. Try dynamic state
+        if (dynamicVerbDetails && dynamicVerbDetails.length > 0) return dynamicVerbDetails;
+
+        // 3. Try on-the-fly lookup
+        const lookupText = formData.root || formData.text;
+        if (lookupText) {
+            const matches = lookupVerb(lookupText);
+            if (matches && matches.length > 0) return matches;
+        }
+
+        return [];
+    };
+
+    // Auto-Detect Handler
+    const handleAutoDetect = async () => {
+        const details = getVerbDetails();
+        if (!details || isAnalyzing) return;
+
+        // Optimization: If only one option, apply it directly without AI
+        if (details.length === 1) {
+            applyVerbOption(details[0]);
+            return;
+        }
+
+        setIsAnalyzing(true);
+        try {
+            // Context Strategy:
+            // 1. Get full line/block text if available for better accuracy
+            // 2. Fallback to just the word itself
+            let contextText = formData.text;
+            let indexInText = 0;
+
+            if (editingTarget && editingTarget.indices) {
+                const { blockIdx, lineIdx, unitIdx } = editingTarget.indices;
+                if (documentData && documentData[blockIdx] && documentData[blockIdx].lines[lineIdx]) {
+                    const line = documentData[blockIdx].lines[lineIdx];
+                    contextText = "";
+                    indexInText = 0;
+
+                    // Reconstruct line text and find our position
+                    for (let i = 0; i < line.units.length; i++) {
+                        const u = line.units[i];
+                        if (i === unitIdx) {
+                            indexInText = contextText.length;
+                        }
+                        contextText += u.original;
+                    }
+                }
+            }
+
+            const payloadItems = [{
+                id: 'current',
+                indexInText: indexInText,
+                original: formData.text,
+                verbOptions: details
+            }];
+
+            const result = await disambiguateVerbs(token, contextText, payloadItems);
+
+            if (result && result.results && result.results.length > 0) {
+                const bestIdx = result.results[0].selectedIndex;
+                const bestOption = details[bestIdx];
+                if (bestOption) {
+                    applyVerbOption(bestOption);
+                }
+            }
+        } catch (err) {
+            console.error("Auto detect failed", err);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    // Verb Selector Component
+    const VerbSelector = () => {
+        const details = getVerbDetails();
+        const hasVerb = startNode.some(n => ['v', 'vd', 'vnd'].includes(n)); // Check if verb selected
+
+        // Show if we have details OR if user explicitly selected a verb type (to allow AI attempt)
+        if ((!details || details.length === 0) && !hasVerb) return null;
+
+        return (
+            <div className="verb-selector-section">
+                <div className="verb-selector-header" style={{ justifyContent: 'flex-start', gap: '8px' }}>
+                    {hasVerb && (
+                        <button
+                            className={`btn-ai-detect ${isAnalyzing ? 'loading' : ''}`}
+                            onClick={handleAutoDetect}
+                            disabled={isAnalyzing || !details || details.length === 0} // Disable if no dictionary match
+                            title={(!details || details.length === 0) ? "No dictionary entry found" : "AI Disambiguation"}
+                        >
+                            {isAnalyzing ? '...' : 'Helper'}
+                        </button>
+                    )}
+                    <button
+                        className={`btn-verify ${data?.analysis?.isPolished ? 'verified' : ''}`}
+                        onClick={toggleVerified}
+                    >
+                        {data?.analysis?.isPolished ? 'Verified' : 'Unverified'}
+                    </button>
+                    <button
+                        className="btn-toggle-def"
+                        onClick={() => setShowDefinitions(!showDefinitions)}
+                        title="Toggle Dictionary Definition"
+                        style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2em' }}
+                    >
+                        {showDefinitions ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                </div>
+
+                {/* Dictionary Definition Display */}
+                {showDefinitions && details && details.length > 0 && (
+                    <div className="verb-def-hint" style={{
+                        marginTop: '8px',
+                        padding: '8px',
+                        background: '#f8f9fa',
+                        borderRadius: '4px',
+                        fontSize: '0.85rem',
+                        color: '#4b5563',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <strong>Dict:</strong> {details[0].definition}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     if (!isOpen) return null;
 
     // Format node text
@@ -294,10 +508,15 @@ const EditPopover = () => {
 
     const handleSave = () => {
         const posString = getPreviewText();
+        // FIX: Extract tense from startAttrs for saving
+        const tenseMeta = startAttrs.tense.length > 0 ? startAttrs.tense[0] : '';
+
         handleSaveEdit({
             ...formData,
             pos: posString,
-            tense: ''
+            tense: tenseMeta, // Pass current UI tense
+            isPolished: true // Explicit save also marks as polished? Or should this be manual toggle only? 
+            // Let's assume hitting save implies manual verification for now.
         }, parentMode);
     };
 
@@ -434,6 +653,8 @@ const EditPopover = () => {
                     {formData.text || '(no text)'}
                 </div>
 
+                <VerbSelector />
+
                 {/* POS Selection */}
                 <div className="pos-button-grid">
                     {POS_TYPES.map(t => (
@@ -513,6 +734,17 @@ const EditPopover = () => {
                 />
 
                 {/* Definition */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label" style={{ fontSize: '0.75rem', color: '#666', marginBottom: '2px' }}>Definition</label>
+                    {data?.analysis?.verbDetails && data.analysis.verbDetails.length > 0 && (
+                        <span
+                            title={`Dictionary: ${data.analysis.verbDetails[0].definition}`}
+                            style={{ fontSize: '0.8rem', cursor: 'help', color: '#8b5cf6' }}
+                        >
+                            📚 Hint
+                        </span>
+                    )}
+                </div>
                 <textarea
                     className="form-input form-input-sm"
                     rows={2}

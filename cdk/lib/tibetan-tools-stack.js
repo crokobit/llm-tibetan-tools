@@ -3,6 +3,7 @@ const dynamodb = require('aws-cdk-lib/aws-dynamodb');
 const s3 = require('aws-cdk-lib/aws-s3');
 const lambda = require('aws-cdk-lib/aws-lambda');
 const apigw = require('aws-cdk-lib/aws-apigatewayv2');
+// const iam = require('aws-cdk-lib/aws-iam'); // Not needed for Bedrock anymore
 const { HttpLambdaIntegration } = require('@aws-cdk/aws-apigatewayv2-integrations-alpha');
 const path = require('path');
 require('dotenv').config(); // Load environment variables from .env file
@@ -41,6 +42,7 @@ class TibetanToolsStack extends Stack {
         // Secrets (Read from environment variables loaded by dotenv)
         const googleClientId = process.env.GOOGLE_CLIENT_ID || this.node.tryGetContext('GOOGLE_CLIENT_ID');
         const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || this.node.tryGetContext('GOOGLE_CLIENT_SECRET');
+        const openaiApiKey = process.env.OPENAI_API_KEY || this.node.tryGetContext('OPENAI_API_KEY');
 
         if (!googleClientId || !googleClientSecret) {
             console.warn('WARNING: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET. Authentication will fail.');
@@ -55,6 +57,7 @@ class TibetanToolsStack extends Stack {
                 BUCKET_NAME: bucket.bucketName,
                 GOOGLE_CLIENT_ID: googleClientId,
                 GOOGLE_CLIENT_SECRET: googleClientSecret,
+                OPENAI_API_KEY: openaiApiKey,
             },
             timeout: Duration.seconds(10),
         };
@@ -165,6 +168,19 @@ class TibetanToolsStack extends Stack {
         });
         jobsTable.grantReadData(getJobFunction);
 
+        // Disambiguate Function
+        const disambiguateFunction = new lambda.Function(this, 'DisambiguateFunction', {
+            ...commonProps,
+            handler: 'disambiguate.handler',
+            timeout: Duration.seconds(60),
+        });
+
+        // Grant Bedrock permissions - REMOVED for OpenAI
+        // disambiguateFunction.addToRolePolicy(new iam.PolicyStatement({
+        //     actions: ['bedrock:InvokeModel'],
+        //     resources: ['arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0']
+        // }));
+
         // API Gateway
         const httpApi = new apigw.HttpApi(this, 'TibetanToolsApi', {
             corsPreflight: {
@@ -226,6 +242,12 @@ class TibetanToolsStack extends Stack {
             path: '/job/{jobId}',
             methods: [apigw.HttpMethod.GET],
             integration: new HttpLambdaIntegration('GetJobIntegration', getJobFunction),
+        });
+
+        httpApi.addRoutes({
+            path: '/disambiguate',
+            methods: [apigw.HttpMethod.POST],
+            integration: new HttpLambdaIntegration('DisambiguateIntegration', disambiguateFunction),
         });
 
         new CfnOutput(this, 'ApiUrl', {
