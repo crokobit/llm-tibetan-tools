@@ -521,11 +521,6 @@ function TibetanReaderContent() {
                             {documentData.length === 0 && (
                                 <div className="empty-state">
                                     <div className="flex gap-4 p-8 justify-center">
-                                        {user && (
-                                            <button onClick={handleOpenCloud} disabled={isApiBusy} className={`btn-insert-large bg-green-600 text-white px-6 py-3 rounded-lg shadow hover:bg-green-700 font-medium text-lg ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                                {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
-                                            </button>
-                                        )}
                                         <button onClick={() => setShowPasteModal(true)} className="btn-insert-large bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 font-medium text-lg">Add analyzed text</button>
                                         <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-large bg-purple-600 text-white px-6 py-3 rounded-lg shadow hover:bg-purple-700 font-medium text-lg">+ Tibetan</button>
                                     </div>
