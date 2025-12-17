@@ -39,10 +39,10 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
 
         return (
             <span
-                className={`tibetan-unit-container tibetan-word-box`}
+                className={`tibetan-unit-container tibetan-word-box tibetan-unit-wrapper`}
                 data-indices={indices ? JSON.stringify(indices) : undefined}
                 onClick={(e) => e.stopPropagation()}
-                style={{ position: 'relative', zIndex }}
+                style={{ zIndex }}
             ><span className={`tibetan-font ${isNested ? 'tibetan-base' : FONT_SIZES.tibetan}`}>
                     {content}
                 </span></span>

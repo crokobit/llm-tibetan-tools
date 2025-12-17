@@ -500,23 +500,21 @@ function TibetanReaderContent() {
                         <button
                             onClick={handleOpenCloud}
                             disabled={isApiBusy}
-                            className={`btn-export ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            style={{ marginRight: '10px' }}
+                            className={`btn-export toolbar-btn-spacing ${isApiBusy ? 'is-disabled' : ''}`}
                         >
                             {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
                         </button>
                     )}
                     <button
                         onClick={() => setShowPasteModal(true)}
-                        className="btn-export"
-                        style={{ marginRight: '10px' }}
+                        className="btn-export toolbar-btn-spacing"
                     >
                         Add analyzed text
                     </button>
 
                     {saveFilename ? (
-                        <div className="file-input-custom" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontWeight: 600, color: '#2563eb' }}>{saveFilename}</span>
+                        <div className="file-input-custom filename-container">
+                            <span className="current-filename">{saveFilename}</span>
                         </div>
                     ) : (
                         <input
@@ -538,7 +536,7 @@ function TibetanReaderContent() {
                                 <>
                                     <button
                                         onClick={() => saveFilename ? handleSaveCloud() : setShowSaveDialog(true)}
-                                        className={`btn-export ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        className={`btn-export ${isApiBusy ? 'is-disabled' : ''}`}
                                         disabled={isApiBusy}
                                     >
                                         {isSaving ? 'Saving...' : (saveFilename ? 'Save' : 'Save to Cloud')}
@@ -550,9 +548,8 @@ function TibetanReaderContent() {
                                                 setRenameNewFilename(saveFilename);
                                                 setShowRenameDialog(true);
                                             }}
-                                            className="btn-export"
+                                            className="btn-export btn-rename"
                                             disabled={isApiBusy}
-                                            style={{ marginLeft: '10px' }}
                                         >
                                             Rename
                                         </button>
@@ -560,9 +557,8 @@ function TibetanReaderContent() {
                                     {saveFilename && (
                                         <button
                                             onClick={() => handleDeleteCloud(saveFilename)}
-                                            className={`btn-export bg-red-600 hover:bg-red-700 ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            className={`btn-export btn-delete-main ${isApiBusy ? 'is-disabled' : ''}`}
                                             disabled={isApiBusy}
-                                            style={{ marginLeft: '10px', backgroundColor: '#dc2626', color: 'white' }}
                                         >
                                             Delete
                                         </button>
@@ -603,9 +599,9 @@ function TibetanReaderContent() {
                     ) : (
                         <>
                             {documentData.length === 0 && (
-                                <div className="empty-state-hint" style={{ textAlign: 'center', margin: '20px 0', color: '#666' }}>
+                                <div className="empty-state-hint">
                                     Start by "+ analyzed text" or "+ Tibetan" then analyse later.
-                                    <div className="block-insert-controls" style={{ justifyContent: 'center', marginTop: '10px' }}>
+                                    <div className="block-insert-controls block-insert-controls-centered">
                                         <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
                                         <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
                                         <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
@@ -696,11 +692,11 @@ function TibetanReaderContent() {
                         <h3>Your Files</h3>
                         <ul className="file-list">
                             {userFiles.map(file => (
-                                <li key={file.filename} className={`file-item ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span onClick={() => !isApiBusy && loadFile(file.filename)} style={{ flexGrow: 1, cursor: 'pointer' }}>
+                                <li key={file.filename} className={`file-item file-item-container ${isApiBusy ? 'is-disabled' : ''}`}>
+                                    <span onClick={() => !isApiBusy && loadFile(file.filename)} className="file-item-name">
                                         {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
                                     </span>
-                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                    <div className="file-item-actions">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -708,8 +704,7 @@ function TibetanReaderContent() {
                                                 setRenameNewFilename(file.filename);
                                                 setShowRenameDialog(true);
                                             }}
-                                            className="btn-export"
-                                            style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                                            className="btn-export btn-file-action"
                                             disabled={isApiBusy}
                                         >
                                             Rename
@@ -719,8 +714,7 @@ function TibetanReaderContent() {
                                                 e.stopPropagation();
                                                 handleDeleteCloud(file.filename);
                                             }}
-                                            className="btn-delete-small"
-                                            style={{ padding: '2px 8px', fontSize: '0.8rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                            className="btn-file-delete"
                                             disabled={isApiBusy}
                                         >
                                             Delete

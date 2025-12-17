@@ -1802,3 +1802,107 @@ body.resizing-active {
     cursor: col-resize !important;
     user-select: none !important; /* Prevent text selection during resize mode */
 }
+
+/* Refactoring Additions */
+
+.toolbar-btn-spacing {
+    margin-right: 10px;
+}
+
+.filename-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.current-filename {
+    font-weight: 600;
+    color: #2563eb;
+}
+
+.btn-rename {
+    margin-left: 10px;
+}
+
+.btn-delete-main {
+    margin-left: 10px;
+    background-color: #dc2626;
+    color: white;
+}
+
+.btn-delete-main:hover {
+    background-color: #b91c1c;
+}
+
+.empty-state-hint {
+    text-align: center;
+    margin: 20px 0;
+    color: #666;
+}
+
+.block-insert-controls-centered {
+    justify-content: center;
+    margin-top: 10px;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.file-item-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.file-item-name {
+    flex-grow: 1;
+    cursor: pointer;
+}
+
+.file-item-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-file-action {
+    padding: 2px 8px;
+    font-size: 0.8rem;
+}
+
+.btn-file-delete {
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-file-delete:hover {
+    background: #b91c1c;
+}
+
+.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-delete-small {
+     /* Replaces bg-red-600 hover:bg-red-700 from App.jsx if used there, but also defined in styles.css already? */
+     /* Actually .btn-delete-small was used with style override in App.jsx. Let's make it consistent. */
+}
+
+.modal-content-large {
+    width: 600px;
+    max-width: 90%;
+}
+
+.tibetan-input-area {
+    height: 200px;
+    font-family: 'Monlam', 'Microsoft Himalaya', sans-serif;
+    font-size: 1.2rem;
+}
+
+.tibetan-unit-wrapper {
+    position: relative;
+}

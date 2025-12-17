@@ -14,7 +14,7 @@ export default function PasteModal({ isOpen, onClose, onImport }) {
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content" style={{ width: '600px', maxWidth: '90%' }}>
+            <div className="modal-content modal-content-large">
                 <h3>Import Analyzed Text</h3>
                 <p className="text-sm text-gray-600 mb-4">
                     Paste your analyzed Tibetan text string below (format: {`>>> Raw >>>> Analysis >>>>>`}).
@@ -23,8 +23,7 @@ export default function PasteModal({ isOpen, onClose, onImport }) {
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder=">>> ..."
-                    className="modal-input"
-                    style={{ height: '200px', fontFamily: 'Monlam, Microsoft Himalaya, sans-serif', fontSize: '1.2rem' }}
+                    className="modal-input tibetan-input-area"
                 />
                 <div className="modal-actions">
                     <button onClick={onClose} className="btn-cancel">Cancel</button>
