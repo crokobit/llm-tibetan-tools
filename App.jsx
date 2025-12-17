@@ -443,6 +443,13 @@ function TibetanReaderContent() {
                             {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
                         </button>
                     )}
+                    <button
+                        onClick={() => setShowPasteModal(true)}
+                        className="btn-export"
+                        style={{ marginRight: '10px' }}
+                    >
+                        Add analyzed text
+                    </button>
 
                     {saveFilename ? (
                         <div className="file-input-custom" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -519,10 +526,12 @@ function TibetanReaderContent() {
                     ) : (
                         <>
                             {documentData.length === 0 && (
-                                <div className="empty-state">
-                                    <div className="flex gap-4 p-8 justify-center">
-                                        <button onClick={() => setShowPasteModal(true)} className="btn-insert-large bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 font-medium text-lg">Add analyzed text</button>
-                                        <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-large bg-purple-600 text-white px-6 py-3 rounded-lg shadow hover:bg-purple-700 font-medium text-lg">+ Tibetan</button>
+                                <div className="empty-state-hint" style={{ textAlign: 'center', margin: '20px 0', color: '#666' }}>
+                                    Start by "+ analyzed text" or "+ Tibetan" then analyse later.
+                                    <div className="block-insert-controls" style={{ justifyContent: 'center', marginTop: '10px' }}>
+                                        <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
+                                        <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
+                                        <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
                                     </div>
                                 </div>
                             )}
@@ -550,17 +559,10 @@ function TibetanReaderContent() {
 
                                     {/* Insert buttons after each block */}
                                     <div className="block-insert-controls">
+
                                         <button onClick={() => insertRichTextBlock(blockIdx)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
                                         <button onClick={() => insertTibetanBlock(blockIdx)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
-                                        {block.type === 'tibetan' && (
-                                            <button
-                                                onClick={() => toggleBlockDebug(blockIdx)}
-                                                className={`btn-insert-small ${block._showDebug ? 'bg-blue-50 text-blue-600 border-blue-200' : ''}`}
-                                                title="Toggle Debug View"
-                                            >
-                                                {block._showDebug ? 'Hide Debug' : 'Debug'}
-                                            </button>
-                                        )}
+                                        <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
                                     </div>
                                 </div>
                             ))}
