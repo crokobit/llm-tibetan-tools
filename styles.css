@@ -800,6 +800,15 @@ body {
     font-size: 0.875rem;
 }
 
+/* Polished Indicator */
+.polished-indicator {
+    display: inline-block;
+    margin-left: 2px;
+    font-size: 0.75rem;
+    vertical-align: middle;
+    filter: drop-shadow(0 0 1px rgba(255, 215, 0, 0.5));
+}
+
 .operator-button.selected {
     background-color: #eef2ff;
     border-color: #6366f1;

@@ -58,7 +58,8 @@ export function EditProvider({ children }) {
                 pos: data.pos,
                 root: data.root,
                 tense: data.tense,
-                definition: data.definition
+                definition: data.definition,
+                isPolished: data.isPolished
             };
 
             const newUnit = {
@@ -134,7 +135,8 @@ export function EditProvider({ children }) {
                     pos: data.pos,
                     root: data.root,
                     tense: data.tense,
-                    definition: data.definition
+                    definition: data.definition,
+                    isPolished: data.isPolished
                 };
             } else {
                 // Editing main unit
@@ -147,7 +149,8 @@ export function EditProvider({ children }) {
                     pos: data.pos,
                     root: data.root,
                     tense: data.tense,
-                    definition: data.definition
+                    definition: data.definition,
+                    isPolished: data.isPolished
                 };
             }
         }

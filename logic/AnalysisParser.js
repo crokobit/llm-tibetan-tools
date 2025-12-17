@@ -17,6 +17,8 @@ export default class AnalysisParser {
 
         const match = content.match(RegexGrammar.ANALYSIS_CONTENT);
 
+        let isPolished = false;
+
         if (match) {
             volls = match[1].trim();
             // Manually split content into POS and Tense, respecting parentheses
@@ -42,6 +44,16 @@ export default class AnalysisParser {
                 tense = '';
             }
 
+            // Check for polished flag
+            if (pos && (pos.includes(',polished') || pos.includes('polished'))) {
+                isPolished = true;
+                pos = pos.replace(/,polished/g, '').replace(/polished/g, '').replace(/,$/, '').trim();
+            }
+            if (tense && (tense.includes(',polished') || tense.includes('polished'))) {
+                isPolished = true;
+                tense = tense.replace(/,polished/g, '').replace(/polished/g, '').replace(/,$/, '').trim();
+            }
+
             let rest = match[3].trim();
 
             // Attempt to separate Root from Definition
@@ -58,7 +70,7 @@ export default class AnalysisParser {
             definition = content.replace(/{[^}]+}/i, '').trim();
         }
 
-        let analysis = { volls, pos, root, tense, definition };
+        let analysis = { volls, pos, root, tense, definition, isPolished };
 
         // Auto-fill verb info if missing or to enhance
         // We use the root for lookup
@@ -70,7 +82,8 @@ export default class AnalysisParser {
     }
 
     static serialize(analysisObj, originalWord) {
-        const { volls, root, pos, tense, definition } = analysisObj;
+        if (analysisObj.isPolished) console.log('Serializing polished verb:', analysisObj);
+        const { volls, root, pos, tense, definition, isPolished } = analysisObj;
 
         // Clean POS string to ensure we don't duplicate tense
         let finalPos = pos || 'other';
@@ -85,6 +98,11 @@ export default class AnalysisParser {
                 // Not present, so append it
                 finalPos = `${finalPos},${finalTense}`;
             }
+        }
+
+        // Add polished tag if applicable
+        if (isPolished) {
+            finalPos = `${finalPos},polished`;
         }
 
         const bString = finalPos;

@@ -252,6 +252,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                     {/* Main Analysis Text */}
                     <span className="flex flex-col items-center">
                         <AnalysisLabel text={analysis.root} isSub={isNested} />
+                        {analysis.isPolished && <span className="polished-indicator" title="Polished by AI">✨</span>}
                         {analysis.tense && <span className="tense-label">({analysis.tense})</span>}
                         <span className={`analysis-def ${isNested ? 'analysis-def-sub' : 'analysis-def-main'}`}>
                             {displayDef}
@@ -301,7 +302,10 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
 
                             {/* Sub Analysis Text */}
                             <span className="sub-analysis-content">
-                                <span className="analysis-label-sub">{u.analysis?.root}</span>
+                                <span className="analysis-label-sub">
+                                    {u.analysis?.root}
+                                    {u.analysis?.isPolished && <span className="polished-indicator" title="Polished by AI">✨</span>}
+                                </span>
                                 <span className="analysis-def-sub">
                                     {subDef}
                                 </span>
