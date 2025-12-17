@@ -99,3 +99,22 @@ export const getJob = async (token, jobId) => {
 
     return response.json();
 };
+
+export const deleteFile = async (token, filename) => {
+    const response = await fetch(`${API_BASE_URL}/delete?filename=${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (response.status === 401) {
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        throw new Error('Failed to delete file');
+    }
+
+    return response.json();
+};

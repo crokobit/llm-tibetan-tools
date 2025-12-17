@@ -97,6 +97,14 @@ class TibetanToolsStack extends Stack {
         table.grantReadData(getFileFunction);
 
 
+        // Delete File Function
+        const deleteFileFunction = new lambda.Function(this, 'DeleteFileFunction', {
+            ...commonProps,
+            handler: 'delete_file.handler',
+        });
+        table.grantWriteData(deleteFileFunction);
+        bucket.grantDelete(deleteFileFunction);
+
         // Jobs Table
         const jobsTable = new dynamodb.Table(this, 'TibetanToolsJobs', {
             partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
@@ -152,7 +160,7 @@ class TibetanToolsStack extends Stack {
         const httpApi = new apigw.HttpApi(this, 'TibetanToolsApi', {
             corsPreflight: {
                 allowHeaders: ['Authorization', 'Content-Type'],
-                allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.OPTIONS],
+                allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PUT, apigw.CorsHttpMethod.DELETE, apigw.CorsHttpMethod.OPTIONS],
                 allowOrigins: ['*'], // Restrict in production
             },
         });
@@ -185,6 +193,12 @@ class TibetanToolsStack extends Stack {
             path: '/get',
             methods: [apigw.HttpMethod.GET],
             integration: new HttpLambdaIntegration('GetFileIntegration', getFileFunction),
+        });
+
+        httpApi.addRoutes({
+            path: '/delete',
+            methods: [apigw.HttpMethod.DELETE],
+            integration: new HttpLambdaIntegration('DeleteFileIntegration', deleteFileFunction),
         });
 
         httpApi.addRoutes({

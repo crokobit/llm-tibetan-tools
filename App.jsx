@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppProviders, useDocument, useEdit, useSelection, useAuth } from './contexts/index.jsx';
-import { saveFile, listFiles, getFile, analyzeText } from './utils/api.js';
+import { saveFile, listFiles, getFile, analyzeText, deleteFile } from './utils/api.js';
 import AnalysisParser from './logic/AnalysisParser.js';
 import ResponseProcessor from './logic/ResponseProcessor.js';
 import EditPopover from './components/EditPopover.jsx';
@@ -139,6 +139,51 @@ function TibetanReaderContent() {
         }
     };
 
+    const handleDeleteCloud = async (filename) => {
+        if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
+
+        setIsSaving(true);
+        try {
+            await deleteFile(token, filename);
+            showToast('File deleted successfully');
+
+            // Refresh list if list is open
+            if (showFileList) {
+                const files = await listFiles(token);
+                setUserFiles(files);
+            }
+
+            // If deleted file was open, clear saveFilename
+            if (saveFilename === filename) {
+                setSaveFilename('');
+            }
+        } catch (error) {
+            console.error(error);
+            if (error.message === 'Unauthorized') {
+                try {
+                    const newToken = await refreshSession();
+                    await deleteFile(newToken, filename);
+                    showToast('File deleted successfully');
+                    if (showFileList) {
+                        const files = await listFiles(newToken);
+                        setUserFiles(files);
+                    }
+                    if (saveFilename === filename) {
+                        setSaveFilename('');
+                    }
+                } catch (refreshError) {
+                    showToast('Session expired. Please login again.');
+                    logout();
+                }
+            } else {
+                showToast('Failed to delete file.');
+            }
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+
     const loadFile = async (filename) => {
         setIsLoadingFile(filename);
         try {
@@ -146,9 +191,11 @@ function TibetanReaderContent() {
             // Expecting response to be { content: "stringified_json" }
             if (response && response.content) {
                 const data = JSON.parse(response.content);
-                setDocumentData(data);
+                const dataNoDebug = data.map(block => ({ ...block, _showDebug: false }));
+                setDocumentData(dataNoDebug);
                 setSaveFilename(filename);
                 setShowFileList(false);
+
             } else {
                 throw new Error("Invalid file format");
             }
@@ -161,9 +208,11 @@ function TibetanReaderContent() {
                     const response = await getFile(newToken, filename);
                     if (response && response.content) {
                         const data = JSON.parse(response.content);
-                        setDocumentData(data);
+                        const dataNoDebug = data.map(block => ({ ...block, _showDebug: false }));
+                        setDocumentData(dataNoDebug);
                         setSaveFilename(filename);
                         setShowFileList(false);
+
                     }
                 } catch (refreshError) {
                     showToast('Session expired. Please login again.');
@@ -424,6 +473,16 @@ function TibetanReaderContent() {
                                     >
                                         {isSaving ? 'Saving...' : (saveFilename ? 'Save' : 'Save to Cloud')}
                                     </button>
+                                    {saveFilename && (
+                                        <button
+                                            onClick={() => handleDeleteCloud(saveFilename)}
+                                            className={`btn-export bg-red-600 hover:bg-red-700 ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            disabled={isApiBusy}
+                                            style={{ marginLeft: '10px', backgroundColor: '#dc2626', color: 'white' }}
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
                                 </>
                             )}
                             <div className="toolbar-controls-container">
@@ -562,8 +621,21 @@ function TibetanReaderContent() {
                         <h3>Your Files</h3>
                         <ul className="file-list">
                             {userFiles.map(file => (
-                                <li key={file.filename} onClick={() => !isApiBusy && loadFile(file.filename)} className={`file-item ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
+                                <li key={file.filename} className={`file-item ${isApiBusy ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span onClick={() => !isApiBusy && loadFile(file.filename)} style={{ flexGrow: 1, cursor: 'pointer' }}>
+                                        {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
+                                    </span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteCloud(file.filename);
+                                        }}
+                                        className="btn-delete-small"
+                                        style={{ marginLeft: '10px', padding: '2px 8px', fontSize: '0.8rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                        disabled={isApiBusy}
+                                    >
+                                        Delete
+                                    </button>
                                 </li>
                             ))}
                         </ul>
