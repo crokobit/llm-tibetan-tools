@@ -39,6 +39,7 @@ const UnitRenderer = ({ unit, indices, onClick, isNested, editingTarget, isAnyEd
 
         return (
             <span
+                id={`unit-${indices.blockIdx}-${indices.lineIdx}-${indices.unitIdx}-text`}
                 className={`tibetan-unit-container tibetan-word-box tibetan-unit-wrapper`}
                 data-indices={indices ? JSON.stringify(indices) : undefined}
                 onClick={(e) => e.stopPropagation()}

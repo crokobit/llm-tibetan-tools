@@ -227,40 +227,93 @@ const EditPopover = () => {
         }
     }, [data, isCreating, possibleParents, editingTarget]);
 
-    // Smart Positioning
+    // Smart Positioning with Dynamic ID Lookup
     React.useLayoutEffect(() => {
-        if (!isOpen || !anchorRect || !popoverRef.current) return;
+        if (!isOpen) return;
 
-        const popRect = popoverRef.current.getBoundingClientRect();
-        const viewportH = window.innerHeight;
-        const viewportW = window.innerWidth;
-        const scrollY = window.scrollY;
-        const scrollX = window.scrollX;
+        const updatePosition = () => {
+            if (!editingTarget || !popoverRef.current) return;
 
-        let top = anchorRect.bottom + scrollY + 12;
-        let left = anchorRect.left + scrollX;
-        let newPlacement = 'bottom';
+            const { blockIdx, lineIdx, unitIdx, subIndex } = editingTarget.indices;
+            let targetId = '';
 
-        if (anchorRect.bottom + popRect.height + 20 > viewportH + scrollY) {
-            if (anchorRect.top - popRect.height - 12 > scrollY) {
-                top = anchorRect.top + scrollY - popRect.height - 12;
-                newPlacement = 'top';
+            if (editingTarget.isCreating) {
+                // If creating, target depends on parent mode or just text unit
+                // For new creation on text unit:
+                targetId = `unit-${blockIdx}-${lineIdx}-${unitIdx}-text`;
+
+                // If sub-creation on existing word (parentMode=sub), complex logic might be needed
+                // But generally the click comes from the unit itself. 
+                // Let's rely on the indices passed.
+                if (subIndex !== null && subIndex !== undefined) {
+                    targetId = `unit-${blockIdx}-${lineIdx}-${unitIdx}-sub-${subIndex}`;
+                }
             } else {
-                top = scrollY + viewportH - popRect.height - 10;
-                newPlacement = 'bottom';
+                // Editing existing
+                if (subIndex !== null && subIndex !== undefined) {
+                    targetId = `unit-${blockIdx}-${lineIdx}-${unitIdx}-sub-${subIndex}`;
+                } else {
+                    targetId = `unit-${blockIdx}-${lineIdx}-${unitIdx}-main`;
+                }
             }
-        }
 
-        if (left + popRect.width > viewportW + scrollX) {
-            left = scrollX + viewportW - popRect.width - 10;
-        }
-        if (left < scrollX) {
-            left = scrollX + 10;
-        }
+            const targetEl = document.getElementById(targetId);
 
-        setCoords({ top, left, opacity: 1 });
-        setPlacement(newPlacement);
-    }, [isOpen, anchorRect, startNode, startAttrs, operator, endNode, endAttrs, parentMode]);
+            // Fallback to anchorRect if ID not found (though it should be)
+            let rect = anchorRect;
+            if (targetEl) {
+                rect = targetEl.getBoundingClientRect();
+            }
+
+            if (!rect) return;
+
+            const popRect = popoverRef.current.getBoundingClientRect();
+            const viewportH = window.innerHeight;
+            const viewportW = window.innerWidth;
+            const scrollY = window.scrollY;
+            const scrollX = window.scrollX;
+
+            let top = rect.bottom + scrollY + 12;
+            let left = rect.left + scrollX;
+            let newPlacement = 'bottom';
+
+            // Vertical collision
+            if (rect.bottom + popRect.height + 20 > viewportH + scrollY) {
+                // Try top
+                if (rect.top - popRect.height - 12 > scrollY) {
+                    top = rect.top + scrollY - popRect.height - 12;
+                    newPlacement = 'top';
+                } else {
+                    // stick to bottom if nowhere else (or adjust)
+                    top = scrollY + viewportH - popRect.height - 10;
+                    newPlacement = 'bottom';
+                }
+            }
+
+            // Horizontal collision
+            if (left + popRect.width > viewportW + scrollX) {
+                left = scrollX + viewportW - popRect.width - 10;
+            }
+            if (left < scrollX) {
+                left = scrollX + 10;
+            }
+
+            setCoords({ top, left, opacity: 1 });
+            setPlacement(newPlacement);
+        };
+
+        // Initial update
+        updatePosition();
+
+        // Listen for resize and scroll
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true); // Capture phase for all scrollable parents
+
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [isOpen, anchorRect, editingTarget, startNode, startAttrs, operator, endNode, endAttrs, parentMode]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {

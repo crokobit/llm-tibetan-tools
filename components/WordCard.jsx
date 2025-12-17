@@ -234,6 +234,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
 
                 {/* --- Row 2: Main Analysis (Spans all cols) --- */}
                 <span
+                    id={`unit-${indices.blockIdx}-${indices.lineIdx}-${indices.unitIdx}-main`}
                     className="main-analysis-box"
                     data-part="main-analysis"
                     onContextMenu={handleContextMenu}
@@ -279,6 +280,7 @@ const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isA
                     return (
                         <span
                             key={`sub-${i}`}
+                            id={`unit-${indices.blockIdx}-${indices.lineIdx}-${indices.unitIdx}-sub-${i}`}
                             data-subindex={i}
                             data-part="sub-analysis"
                             className={`sub-analysis-cell ${isThisSubEditing ? 'editing' : ''} ${isAnalyzed ? 'analyzed' : ''} ${isAnalyzed && !isAnyEditActive ? 'allow-hover' : ''}`}
