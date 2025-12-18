@@ -59,7 +59,8 @@ export function EditProvider({ children }) {
                 root: data.root,
                 tense: data.tense,
                 definition: data.definition,
-                isPolished: data.isPolished
+                verbId: data.verbId,
+                isPolished: !!data.verbId
             };
 
             const newUnit = {
@@ -136,7 +137,8 @@ export function EditProvider({ children }) {
                     root: data.root,
                     tense: data.tense,
                     definition: data.definition,
-                    isPolished: data.isPolished
+                    verbId: data.verbId,
+                    isPolished: !!data.verbId
                 };
             } else {
                 // Editing main unit
@@ -150,7 +152,8 @@ export function EditProvider({ children }) {
                     root: data.root,
                     tense: data.tense,
                     definition: data.definition,
-                    isPolished: data.isPolished
+                    verbId: data.verbId,
+                    isPolished: !!data.verbId
                 };
             }
         }

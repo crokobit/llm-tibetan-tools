@@ -47,7 +47,7 @@ const EditPopover = () => {
 
     // Form data
     const [formData, setFormData] = useState({
-        text: '', volls: '', root: '', definition: ''
+        text: '', volls: '', root: '', definition: '', verbId: null
     });
     const [parentMode, setParentMode] = useState('main');
     const popoverRef = useRef(null);
@@ -177,7 +177,7 @@ const EditPopover = () => {
     useEffect(() => {
         if (isCreating) {
             const selectedText = editingTarget?.creationDetails?.selectedText || '';
-            setFormData({ text: selectedText, volls: '', root: '', definition: '' });
+            setFormData({ text: selectedText, volls: '', root: '', definition: '', verbId: null });
             setStartNode([]);
             setStartAttrs({ hon: false, tense: [] });
             setOperator('single');
@@ -196,7 +196,8 @@ const EditPopover = () => {
                 text: data.original || '',
                 volls: data.analysis.volls || '',
                 root: data.analysis.root || '',
-                definition: data.analysis.definition || ''
+                definition: data.analysis.definition || '',
+                verbId: data.analysis.verbId || null
             });
 
             // Parse POS into builder state
@@ -346,16 +347,20 @@ const EditPopover = () => {
     // Apply Verb Option
     const applyVerbOption = (option) => {
         // 1. Definition - DO NOT Overwrite, but maybe set root
-        setFormData(prev => ({ ...prev, root: option.original_word }));
+        setFormData(prev => ({ ...prev, root: option.original_word, verbId: option.id }));
 
         // 2. POS/Tense
         setStartNode(['v']);
 
         // Map Tense: Correct system values are: past, imp, future
+        // Map Tense: Correct system values are: past, imp, future
         const tenses = [];
-        if (option.tense === 'Past') tenses.push('past');
-        if (option.tense === 'Future') tenses.push('future');
-        if (option.tense === 'Imperative') tenses.push('imp');
+        // Handle both array (new) and singular (legacy/fallback) formats
+        const sourceTenses = Array.isArray(option.tenses) ? option.tenses : (option.tense ? [option.tense] : []);
+
+        if (sourceTenses.includes('Past')) tenses.push('past');
+        if (sourceTenses.includes('Future')) tenses.push('future');
+        if (sourceTenses.includes('Imperative')) tenses.push('imp');
         // Present corresponds to no tense suffix usually, so empty array is correct.
 
         const newStartAttrs = {
@@ -382,7 +387,7 @@ const EditPopover = () => {
             root: option.original_word,
             pos: posStr,
             tense: tenseMeta, // FIX: Pass tense to metadata
-            isPolished: true // Mark as polished when manually selected
+            verbId: option.id
         }, parentMode, false);
     };
 
@@ -487,11 +492,15 @@ const EditPopover = () => {
                             {isAnalyzing ? '...' : 'Helper'}
                         </button>
                     )}
-                    {data?.analysis?.isPolished && (
-                        <span className="badge-polished" title="Polished via Helper/AI">
+                    {data?.analysis?.verbId ? (
+                        <span className="badge-polished" title={`Verb ID: ${data.analysis.verbId}`}>
+                            Indexed
+                        </span>
+                    ) : (data?.analysis?.isPolished && (
+                        <span className="badge-polished" title="Legacy Polished">
                             Polished
                         </span>
-                    )}
+                    ))}
                     <button
                         className="btn-toggle-def"
                         onClick={() => setShowDefinitions(!showDefinitions)}
@@ -566,8 +575,6 @@ const EditPopover = () => {
             ...formData,
             pos: posString,
             tense: tenseMeta, // Pass current UI tense
-            isPolished: true // Explicit save also marks as polished? Or should this be manual toggle only? 
-            // Let's assume hitting save implies manual verification for now.
         }, parentMode);
     };
 
@@ -772,7 +779,7 @@ const EditPopover = () => {
                 <input
                     className="form-input"
                     value={formData.root}
-                    onChange={e => setFormData({ ...formData, root: e.target.value })}
+                    onChange={e => setFormData({ ...formData, root: e.target.value, verbId: null })}
                     placeholder="Root"
                 />
 

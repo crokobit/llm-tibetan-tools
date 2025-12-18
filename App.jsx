@@ -10,7 +10,7 @@ import PasteModal from './components/PasteModal.jsx';
 import RichTextBlock from './components/RichTextBlock.jsx';
 import TibetanBlock from './components/TibetanBlock.jsx';
 
-// Internal component that uses contexts
+// Internal component that uses contexts - Main Reader Content
 function TibetanReaderContent() {
     const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();

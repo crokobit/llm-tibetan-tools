@@ -13,7 +13,7 @@ export default class AnalysisParser {
 
         if (content) content = content.split(';')[0].trim();
 
-        let volls = '', pos = 'other', tense = '', root = '', definition = '';
+        let volls = '', pos = 'other', tense = '', root = '', definition = '', verbId = null;
 
         const match = content.match(RegexGrammar.ANALYSIS_CONTENT);
 
@@ -36,22 +36,57 @@ export default class AnalysisParser {
                 }
             }
 
-            if (splitIndex !== -1) {
-                pos = contentInner.substring(0, splitIndex).trim();
-                tense = contentInner.substring(splitIndex + 1).trim();
-            } else {
-                pos = contentInner.trim();
-                tense = '';
+            // Extract ID from indexed(id:...)
+            // Format: v,future,indexed(id:123456)
+            // We need to look for indexed(id:...) in POS or Tense
+
+            const extractId = (str) => {
+                const match = str.match(/indexed\(id:([a-zA-Z0-9]+)\)/);
+                if (match) return match[1];
+                return null;
             }
 
-            // Check for polished flag
-            if (pos && (pos.includes(',polished') || pos.includes('polished'))) {
-                isPolished = true;
-                pos = pos.replace(/,polished/g, '').replace(/polished/g, '').replace(/,$/, '').trim();
+            const cleanStr = (str) => {
+                return str.replace(/,?indexed\(id:[a-zA-Z0-9]+\)/g, '')
+                    .replace(/indexed\(id:[a-zA-Z0-9]+\)/g, '')
+                    .replace(/,polished/g, '') // Legacy support
+                    .replace(/polished/g, '')  // Legacy support
+                    .replace(/,$/, '').trim();
             }
-            if (tense && (tense.includes(',polished') || tense.includes('polished'))) {
-                isPolished = true;
-                tense = tense.replace(/,polished/g, '').replace(/polished/g, '').replace(/,$/, '').trim();
+
+            if (pos) {
+                const id = extractId(pos);
+                if (id) {
+                    verbId = id;
+                    isPolished = true;
+                }
+                pos = cleanStr(pos);
+                // Also handle legacy id: format if needed, but assuming migration
+                if (pos.includes('id:')) {
+                    const idMatch = pos.match(/id:([a-zA-Z0-9]+)/);
+                    if (idMatch) {
+                        verbId = idMatch[1];
+                        isPolished = true;
+                        pos = pos.replace(/,id:[a-zA-Z0-9]+/g, '').replace(/id:[a-zA-Z0-9]+/g, '').replace(/,$/, '').trim();
+                    }
+                }
+            }
+
+            if (tense) {
+                const id = extractId(tense);
+                if (id) {
+                    verbId = id;
+                    isPolished = true;
+                }
+                tense = cleanStr(tense);
+                if (tense.includes('id:')) {
+                    const idMatch = tense.match(/id:([a-zA-Z0-9]+)/);
+                    if (idMatch) {
+                        verbId = idMatch[1];
+                        isPolished = true;
+                        tense = tense.replace(/,id:[a-zA-Z0-9]+/g, '').replace(/id:[a-zA-Z0-9]+/g, '').replace(/,$/, '').trim();
+                    }
+                }
             }
 
             let rest = match[3].trim();
@@ -70,7 +105,7 @@ export default class AnalysisParser {
             definition = content.replace(/{[^}]+}/i, '').trim();
         }
 
-        let analysis = { volls, pos, root, tense, definition, isPolished };
+        let analysis = { volls, pos, root, tense, definition, isPolished, verbId };
 
         // Auto-fill verb info if missing or to enhance
         // We use the root for lookup
@@ -83,7 +118,7 @@ export default class AnalysisParser {
 
     static serialize(analysisObj, originalWord) {
         if (analysisObj.isPolished) console.log('Serializing polished verb:', analysisObj);
-        const { volls, root, pos, tense, definition, isPolished } = analysisObj;
+        const { volls, root, pos, tense, definition, isPolished, verbId } = analysisObj;
 
         // Clean POS string to ensure we don't duplicate tense
         let finalPos = pos || 'other';
@@ -100,8 +135,11 @@ export default class AnalysisParser {
             }
         }
 
-        // Add polished tag if applicable
-        if (isPolished) {
+        // Add verbId properly formatted
+        if (verbId) {
+            finalPos = `${finalPos},indexed(id:${verbId})`;
+        } else if (isPolished) {
+            // Fallback for polished but no ID (shouldn't happen with new logic, but for safety)
             finalPos = `${finalPos},polished`;
         }
 
