@@ -86,14 +86,37 @@ const EditPopover = () => {
                     endAttrs: { hon: false, tense: [] }
                 };
             } else {
-                // It's a union operator
+                // Heuristic: Check if the pipe actually separated tenses that were consumed by parseNode
+                // e.g. "v,past|imp" -> parseNode("v,past|imp") -> ids=['v'], attrs={tense:['past','imp']}
+                // If so, it's NOT a union, it's a single node with multiple tenses
                 const parts = posStr.split('|').map(p => p.trim());
+                if (node.attrs.tense.length > 0) {
+                    // Check if parts after the first one are all tenses found in the node
+                    const extraParts = parts.slice(1);
+                    const consumedAsTense = extraParts.every(p => {
+                        const normalized = p === 'fut' ? 'future' : (p === 'imp' ? 'imp' : (p === 'past' ? 'past' : null));
+                        return normalized && node.attrs.tense.includes(normalized);
+                    });
+
+                    if (consumedAsTense) {
+                        return {
+                            start: node.ids,
+                            startAttrs: node.attrs,
+                            op: 'single',
+                            end: [],
+                            endAttrs: { hon: false, tense: [] }
+                        };
+                    }
+                }
+
+                // It's a union operator
+                const partsUnion = posStr.split('|').map(p => p.trim());
                 return {
-                    start: parseNode(parts[0]).ids,
-                    startAttrs: parseNode(parts[0]).attrs,
+                    start: parseNode(partsUnion[0]).ids,
+                    startAttrs: parseNode(partsUnion[0]).attrs,
                     op: 'union',
-                    end: parseNode(parts[1]).ids,
-                    endAttrs: parseNode(parts[1]).attrs
+                    end: parseNode(partsUnion[1]).ids,
+                    endAttrs: parseNode(partsUnion[1]).attrs
                 };
             }
         } else {

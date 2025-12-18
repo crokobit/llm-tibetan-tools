@@ -10,6 +10,9 @@ import PasteModal from './components/PasteModal.jsx';
 import RichTextBlock from './components/RichTextBlock.jsx';
 import TibetanBlock from './components/TibetanBlock.jsx';
 
+import { lookupVerb } from './utils/verbLookup.js';
+import { disambiguateVerbs } from './utils/api.js';
+
 // Internal component that uses contexts - Main Reader Content
 function TibetanReaderContent() {
     const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
@@ -27,10 +30,11 @@ function TibetanReaderContent() {
     const [showPasteModal, setShowPasteModal] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [notification, setNotification] = useState(null);
+    const [isPolishing, setIsPolishing] = useState(false);
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
-    const isApiBusy = isSaving || isLoadingFiles || !!isLoadingFile;
+    const isApiBusy = isSaving || isLoadingFiles || !!isLoadingFile || isPolishing;
 
     // Load mammoth.js library
     useEffect(() => {
@@ -354,6 +358,184 @@ function TibetanReaderContent() {
         }
     };
 
+    const handlePolishVerbs = async () => {
+        setIsPolishing(true);
+        let count = 0;
+        try {
+            const newData = JSON.parse(JSON.stringify(documentData));
+            const allAmbiguousItems = [];
+            let fullText = '';
+            let globalOffset = 0;
+
+            // 1. Scan Document
+            newData.forEach((block) => {
+                if (block.type !== 'tibetan') return;
+
+                let blockText = '';
+                block.lines.forEach((line, idx) => {
+                    if (idx > 0) blockText += '\n';
+                    line.units.forEach(u => blockText += u.original);
+                });
+
+                // Scan verbs in this block
+                let currentBlockOffset = 0;
+                block.lines.forEach((line, lineIdx) => {
+                    if (lineIdx > 0) currentBlockOffset += 1; // Newline (implicitly handled by blockText structure, but precise tracking helps)
+                    line.units.forEach((unit) => {
+                        const unitLen = unit.original.length;
+
+                        // Skip if already has ID
+                        if (!(unit.analysis && unit.analysis.verbId)) {
+                            const matches = lookupVerb(unit.original);
+                            if (matches && matches.length > 0) {
+                                // Smart Deduplication:
+                                // Filter out entries that have identical meaning (Tenses + Definition + Volition)
+                                const uniqueMap = new Map();
+                                matches.forEach(m => {
+                                    const tensesStr = m.tenses ? (Array.isArray(m.tenses) ? m.tenses.sort().join(',') : m.tenses) : (m.tense || '');
+                                    const key = `${tensesStr}|${m.definition}|${m.volition}`;
+                                    if (!uniqueMap.has(key)) {
+                                        uniqueMap.set(key, m);
+                                    }
+                                });
+
+                                const uniqueMatches = Array.from(uniqueMap.values());
+
+                                if (uniqueMatches.length === 1) {
+                                    // Deterministic
+                                    count++;
+                                    applyVerbMatch(unit, uniqueMatches[0]);
+                                } else {
+                                    // Ambiguous
+                                    const absIndex = globalOffset + currentBlockOffset;
+                                    allAmbiguousItems.push({
+                                        indexInText: absIndex,
+                                        original: unit.original,
+                                        verbOptions: uniqueMatches.map(m => ({ ...m, description: `${m.tenses ? m.tenses.join(',') : m.tense} (${m.definition})` })),
+                                        _unitRef: unit
+                                    });
+                                }
+                            }
+                        }
+                        currentBlockOffset += unitLen;
+                    });
+                });
+
+                fullText += blockText + '\n';
+                globalOffset += blockText.length + 1;
+            });
+
+            // 2. Process AI (Single Batch) with Retry
+            if (allAmbiguousItems.length > 0) {
+                showToast(`Polishing... Disambiguating ${allAmbiguousItems.length} verbs with AI...`);
+
+                // Clean items for API
+                const apiItems = allAmbiguousItems.map(({ _unitRef, ...rest }) => rest);
+
+                // Retry Logic
+                const maxRetries = 3;
+                let attempt = 0;
+                let success = false;
+                let response;
+
+                while (attempt < maxRetries && !success) {
+                    try {
+                        const api = await import('./utils/api.js');
+                        response = await api.disambiguateVerbs(token, fullText, apiItems);
+                        success = true;
+                    } catch (err) {
+                        attempt++;
+                        // Check for 503 or network error
+                        const isRetryable = err.message.includes('503') || err.message.includes('Failed to fetch') || err.message.includes('Service Unavailable');
+
+                        if (isRetryable && attempt < maxRetries) {
+                            console.warn(`AI Polish attempt ${attempt} failed (503/Network). Retrying...`, err);
+                            showToast(`Server busy (503). Retrying (${attempt}/${maxRetries})...`);
+                            // Exponential backoff: 1s, 2s, 4s...
+                            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+                        } else {
+                            if (attempt >= maxRetries) {
+                                console.error("AI Polish failed after max retries", err);
+                                showToast("AI Polish failed: Server busy. Please try again later.");
+                            } else {
+                                console.error("AI Polish failed (non-retryable)", err);
+                                showToast("AI Polish failed: " + err.message);
+                            }
+                            // Break loop to finish deterministic updates
+                            break;
+                        }
+                    }
+                }
+
+                if (success && response && response.results) {
+                    response.results.forEach((res, idx) => {
+                        if (idx >= allAmbiguousItems.length) return;
+                        const originalItem = allAmbiguousItems[idx];
+                        const { selectedIndex } = res;
+
+                        if (selectedIndex !== undefined && selectedIndex >= 0 && selectedIndex < originalItem.verbOptions.length) {
+                            const match = originalItem.verbOptions[selectedIndex];
+                            applyVerbMatch(originalItem._unitRef, match);
+                            count++;
+                        }
+                    });
+                }
+            }
+
+            setDocumentData(newData);
+            if (count > 0) showToast(`Polished ${count} verbs!`);
+            else if (allAmbiguousItems.length > 0) showToast("Polished deterministic verbs only (AI skipped/failed).");
+            else showToast("No new verbs found to polish.");
+
+        } catch (error) {
+            console.error("Polish failed", error);
+            showToast("Polish failed: " + error.message);
+        } finally {
+            setIsPolishing(false);
+        }
+    };
+
+    // Helper to apply match to unit
+    const applyVerbMatch = (unit, match) => {
+        // Construct POS string
+        let posId = match.volition === 'vd' ? 'vd' : (match.volition === 'vnd' ? 'vnd' : 'v');
+        let posParts = [posId];
+
+        let attrs = [];
+        if (match.hon) attrs.push('hon');
+        if (match.tense) {
+            const tenses = Array.isArray(match.tenses) ? match.tenses : [match.tense];
+            const sysTenses = tenses.map(t => {
+                if (t === 'Past') return 'past';
+                if (t === 'Future') return 'future';
+                if (t === 'Imperative') return 'imp';
+                return null;
+            }).filter(t => t);
+
+            if (sysTenses.length > 0) {
+                attrs.push(sysTenses.join('|'));
+            }
+        }
+
+        if (attrs.length > 0) {
+            posParts.push(attrs.join(','));
+        }
+
+        const posStr = posParts.join(',');
+
+        unit.analysis = {
+            ...unit.analysis,
+            verbId: match.id,
+            isPolished: true,
+            root: match.original_word,
+            pos: posStr,
+            tense: match.tense
+        };
+    };
+
+    const calculateUnitIndex = () => 0; // Deprecated
+
+
     const handlePasteAnalyzed = (text) => {
         try {
             const newBlocks = ResponseProcessor.process(text);
@@ -526,6 +708,14 @@ function TibetanReaderContent() {
                     )}
                     {documentData.length > 0 && (
                         <>
+                            <button
+                                onClick={handlePolishVerbs}
+                                disabled={isApiBusy}
+                                className={`btn-export toolbar-btn-spacing ${isApiBusy ? 'is-disabled' : ''}`}
+                                title="Link all recognized verbs to the dictionary"
+                            >
+                                {isPolishing ? 'Polishing...' : 'Polish Verbs'}
+                            </button>
                             <button
                                 onClick={downloadOutput}
                                 className="btn-export"
