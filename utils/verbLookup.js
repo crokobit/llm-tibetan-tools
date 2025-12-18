@@ -13,23 +13,51 @@ export const lookupVerb = (text) => {
 
     // 1. Try exact match
     if (verbIndex[trimmed]) {
-        return verbIndex[trimmed];
+        return sortMatches(verbIndex[trimmed]);
     }
 
     // 2. Try removing suffixes 'པ' (pa) or 'བ' (ba) if present
-    // Note: The user mentioned removing suffix 'བ', but 'པ' is also common in citations (e.g. ཀུམ་པ -> ཀུམ)
     const suffixes = ['པ', 'བ'];
 
     for (const suffix of suffixes) {
         if (trimmed.endsWith(suffix)) {
-            const stem = trimmed.slice(0, -1); // Remove last character
+            let stem = trimmed.slice(0, -1); // Remove last character
+            // Check stem (keeping tsheg)
             if (verbIndex[stem]) {
-                return verbIndex[stem];
+                return sortMatches(verbIndex[stem]);
+            }
+            // Check stem (removing tsheg)
+            if (stem.endsWith('་')) {
+                const stemNoTsheg = stem.slice(0, -1);
+                if (verbIndex[stemNoTsheg]) {
+                    return sortMatches(verbIndex[stemNoTsheg]);
+                }
             }
         }
     }
 
     return null;
+};
+
+// Helper to sort matches by relevance
+const sortMatches = (matches) => {
+    if (!matches || !Array.isArray(matches)) return matches;
+    return [...matches].sort((a, b) => {
+        const scoreA = getScore(a);
+        const scoreB = getScore(b);
+        return scoreB - scoreA;
+    });
+};
+
+const getScore = (item) => {
+    let score = 0;
+    // Volition: Prefer explicit volition (vd/vnd) over None/null
+    if (item.volition && item.volition !== 'None') score += 10;
+
+    // Tense: Prefer more tenses
+    if (item.tenses && Array.isArray(item.tenses)) score += item.tenses.length;
+
+    return score;
 };
 
 /**
