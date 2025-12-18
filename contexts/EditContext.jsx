@@ -42,7 +42,7 @@ export function EditProvider({ children }) {
         setEditingTarget(target);
     };
 
-    const handleSaveEdit = (data, parentMode) => {
+    const handleSaveEdit = (data, parentMode, shouldClose = true) => {
         if (!editingTarget) return;
 
         const { blockIdx, lineIdx, unitIdx, subIndex } = editingTarget.indices;
@@ -156,7 +156,9 @@ export function EditProvider({ children }) {
         }
 
         setDocumentData(newData);
-        setEditingTarget(null);
+        if (shouldClose) {
+            setEditingTarget(null);
+        }
     };
 
     const handleDeleteAnalysis = () => {

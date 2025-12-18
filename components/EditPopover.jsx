@@ -383,7 +383,7 @@ const EditPopover = () => {
             pos: posStr,
             tense: tenseMeta, // FIX: Pass tense to metadata
             isPolished: true // Mark as polished when manually selected
-        }, parentMode);
+        }, parentMode, false);
     };
 
     // Helper to get effective verb details
