@@ -36,30 +36,49 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
     // --- Resolve Verbs Logic ---
     const getVerbsToPolish = () => {
         const verbs = [];
+
+        const traverse = (unit, lineIdx, unitIdx, path = []) => {
+            // Check current unit
+            let details = unit.analysis?.verbDetails;
+
+            // Legacy Data Support: If details are missing, try dynamic lookup
+            if (!details || details.length === 0) {
+                if (unit.analysis && (unit.analysis.root || unit.original)) {
+                    const matches = lookupVerb(unit.analysis.root || unit.original);
+                    if (matches && matches.length > 0) {
+                        details = matches; // Found it!
+                    }
+                }
+            }
+
+            if (details && details.length > 0) {
+                // Check if already polished AND is a verb (v, vd, vnd)
+                const posStr = unit.analysis.pos || '';
+                const posType = posStr.split(',')[0].split('|')[0]; // Extract primary POS type
+                const isVerb = ['v', 'vd', 'vnd'].includes(posType);
+
+                if (!unit.analysis.isPolished && isVerb) {
+                    verbs.push({
+                        lineIdx,
+                        unitIdx,
+                        unit,
+                        dynamicDetails: details,
+                        nestedPath: path
+                    });
+                }
+            }
+
+            // Recurse into nestedData
+            if (unit.nestedData && unit.nestedData.length > 0) {
+                unit.nestedData.forEach((child, childIdx) => {
+                    traverse(child, lineIdx, unitIdx, [...path, childIdx]);
+                });
+            }
+        };
+
         block.lines.forEach((line, lineIdx) => {
             line.units.forEach((unit, unitIdx) => {
-                let details = unit.analysis?.verbDetails;
-
-                // Legacy Data Support: If details are missing, try dynamic lookup
-                if (!details || details.length === 0) {
-                    if (unit.analysis && (unit.analysis.root || unit.original)) {
-                        const matches = lookupVerb(unit.analysis.root || unit.original);
-                        if (matches && matches.length > 0) {
-                            details = matches; // Found it!
-                        }
-                    }
-                }
-
-                if (details && details.length > 0) {
-                    // Check if already polished AND is a verb (v, vd, vnd)
-                    const posStr = unit.analysis.pos || '';
-                    const posType = posStr.split(',')[0].split('|')[0]; // Extract primary POS type
-                    const isVerb = ['v', 'vd', 'vnd'].includes(posType);
-
-                    if (!unit.analysis.isPolished && isVerb) {
-                        verbs.push({ lineIdx, unitIdx, unit, dynamicDetails: details });
-                    }
-                }
+                traverse(unit, lineIdx, unitIdx, []);
             });
         });
         return verbs;
@@ -83,10 +102,41 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                 else ambiguous.push({ ...t, details });
             });
 
+            // Helper to get unit by path
+            const getUnitByPath = (rootUnit, path) => {
+                let current = rootUnit;
+                for (const idx of path) {
+                    if (current && current.nestedData && current.nestedData[idx]) {
+                        current = current.nestedData[idx];
+                    } else {
+                        return null;
+                    }
+                }
+                return current;
+            };
+
+            // Helper to calculate offset of a nested unit relative to its root
+            const getNestedOffset = (rootUnit, path) => {
+                let offset = 0;
+                let current = rootUnit;
+                for (const idx of path) {
+                    if (current.nestedData) {
+                        for (let i = 0; i < idx; i++) {
+                            offset += current.nestedData[i].original.length;
+                        }
+                        current = current.nestedData[idx];
+                    }
+                }
+                return offset;
+            };
+
             // 1. Handle Unambiguous (Auto-Apply)
             unambiguous.forEach(t => {
-                const { lineIdx, unitIdx, details } = t;
-                const unit = newBlock.lines[lineIdx].units[unitIdx];
+                const { lineIdx, unitIdx, details, nestedPath } = t;
+                const rootUnit = newBlock.lines[lineIdx].units[unitIdx];
+                const unit = nestedPath.length > 0 ? getUnitByPath(rootUnit, nestedPath) : rootUnit;
+
+                if (!unit) return;
 
                 // Ensure details are saved to unit if they were dynamic
                 unit.analysis.verbDetails = details;
@@ -120,24 +170,28 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                 block.lines.forEach((line, lIdx) => {
                     line.units.forEach((unit, uIdx) => {
                         const currentText = unit.original;
-                        const targetIdx = ambiguous.findIndex(t => t.lineIdx === lIdx && t.unitIdx === uIdx);
 
-                        if (targetIdx !== -1) {
-                            const target = ambiguous[targetIdx];
-                            const offset = fullText.length;
+                        // Find all targets in this root unit
+                        const rootTargets = ambiguous.filter(t => t.lineIdx === lIdx && t.unitIdx === uIdx);
 
-                            // Ensure details are saved to unit if they were dynamic (in itemMap ref)
-                            // We don't modify 'unit' here directly, but the target ref
+                        rootTargets.forEach(target => {
+                            const offsetInRoot = target.nestedPath.length > 0 ? getNestedOffset(unit, target.nestedPath) : 0;
+                            const globalOffset = fullText.length + offsetInRoot;
+                            const targetUnit = target.nestedPath.length > 0 ? getUnitByPath(unit, target.nestedPath) : unit;
 
-                            itemMap.push({
-                                id: `target-${lIdx}-${uIdx}`,
-                                indexInText: offset,
-                                original: currentText,
-                                verbOptions: target.details,
-                                lineIdx: lIdx,
-                                unitIdx: uIdx
-                            });
-                        }
+                            if (targetUnit) {
+                                itemMap.push({
+                                    id: `target-${lIdx}-${uIdx}-${target.nestedPath.join('-')}`,
+                                    indexInText: globalOffset,
+                                    original: targetUnit.original,
+                                    verbOptions: target.details,
+                                    lineIdx: lIdx,
+                                    unitIdx: uIdx,
+                                    nestedPath: target.nestedPath
+                                });
+                            }
+                        });
+
                         fullText += currentText;
                     });
                     fullText += '\\n';
@@ -149,8 +203,11 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                     result.results.forEach(res => {
                         const item = itemMap.find(i => i.id === res.id);
                         if (item) {
-                            const { lineIdx, unitIdx, verbOptions } = item;
-                            const unit = newBlock.lines[lineIdx].units[unitIdx];
+                            const { lineIdx, unitIdx, verbOptions, nestedPath } = item;
+                            const rootUnit = newBlock.lines[lineIdx].units[unitIdx];
+                            const unit = nestedPath.length > 0 ? getUnitByPath(rootUnit, nestedPath) : rootUnit;
+
+                            if (!unit) return;
 
                             // Save details to stored unit
                             unit.analysis.verbDetails = verbOptions;
