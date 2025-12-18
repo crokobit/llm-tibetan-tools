@@ -207,20 +207,27 @@ const EditPopover = () => {
             setEndNode(parsed.end);
             setEndAttrs(parsed.endAttrs);
 
-            // SYNC FIX: If metadata exists (e.g. from Smart Polish), override the parsed attributes
+            // SYNC FIX: Always override the parsed attributes with metadata for simple cases
             // strictly for simple cases (single start node, no operator)
-            if (data.analysis.isPolished && parsed.op === 'single' && parsed.start.length === 1) {
+            if (parsed.op === 'single' && parsed.start.length === 1) {
                 const nodeType = parsed.start[0];
                 if (['v', 'vd', 'vnd'].includes(nodeType)) {
                     const metadataAttrs = { hon: false, tense: [] };
+
+                    // 1. Hon: Trust metadata if present, otherwise fall back to parsed
                     if (data.analysis.hon) metadataAttrs.hon = true;
+                    else metadataAttrs.hon = parsed.startAttrs.hon;
+
+                    // 2. Tense: Merge metadata tense with parsed tense
+                    const tSet = new Set(parsed.startAttrs.tense); // Start with existing parsed tenses
                     if (data.analysis.tense) {
                         // System uses: past, imp, future
-                        // Ensure it's an array for the state
-                        const tSet = new Set(parsed.startAttrs.tense); // Start with existing
-                        tSet.add(data.analysis.tense);
-                        metadataAttrs.tense = Array.from(tSet);
+                        // Split by | or , to handle multiple tenses in metadata
+                        const metaTenses = data.analysis.tense.split(/[|,]/).map(t => t.trim());
+                        metaTenses.forEach(t => tSet.add(t));
                     }
+                    metadataAttrs.tense = Array.from(tSet);
+
                     setStartAttrs(metadataAttrs);
                 }
             }
@@ -334,15 +341,7 @@ const EditPopover = () => {
         }
     }, [isOpen, handleCloseEdit]);
 
-    // Toggle Verified Status
-    const toggleVerified = () => {
-        handleSaveEdit({
-            ...formData,
-            pos: getPreviewText(), // Ensure POS is up to date
-            tense: '',
-            isPolished: !data?.analysis?.isPolished
-        }, parentMode);
-    };
+
 
     // Apply Verb Option
     const applyVerbOption = (option) => {
@@ -488,12 +487,11 @@ const EditPopover = () => {
                             {isAnalyzing ? '...' : 'Helper'}
                         </button>
                     )}
-                    <button
-                        className={`btn-verify ${data?.analysis?.isPolished ? 'verified' : ''}`}
-                        onClick={toggleVerified}
-                    >
-                        {data?.analysis?.isPolished ? 'Verified' : 'Unverified'}
-                    </button>
+                    {data?.analysis?.isPolished && (
+                        <span className="badge-polished" title="Polished via Helper/AI">
+                            Polished
+                        </span>
+                    )}
                     <button
                         className="btn-toggle-def"
                         onClick={() => setShowDefinitions(!showDefinitions)}
