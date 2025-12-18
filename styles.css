@@ -1652,6 +1652,13 @@ body {
     margin-right: 8px;
 }
 
+.btn-ai-detect:disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 .btn-verify {
     background: transparent;
     border: 1px solid #d1d5db;
