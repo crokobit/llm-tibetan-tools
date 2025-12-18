@@ -23,7 +23,7 @@ const getPosKey = (pos) => {
     // Clean up any remaining parens or delimiters
     // e.g. if we had "(xxx)->y", we got "y".
     // If we just had "n", we get "n".
-    return p.split(/[\->|]/)[0].replace(/[()]/g, '').trim() || 'other';
+    return p.split(/[\->|,]/)[0].replace(/[()]/g, '').trim() || 'other';
 };
 
 const WordCard = ({ unit, onClick, isNested = false, indices, editingTarget, isAnyEditActive, onResize, zIndex }) => {

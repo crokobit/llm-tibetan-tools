@@ -106,6 +106,7 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
 
                 unit.analysis.tense = tenseVal;
                 unit.analysis.hon = option.hon;
+                unit.analysis.verbId = option.id;
                 unit.analysis.isPolished = true;
                 updateCount++;
             });
@@ -168,6 +169,7 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
 
                                 unit.analysis.tense = tenseVal;
                                 unit.analysis.hon = selectedOption.hon;
+                                unit.analysis.verbId = selectedOption.id;
                                 unit.analysis.isPolished = true;
                                 updateCount++;
                             }

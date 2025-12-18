@@ -84,7 +84,7 @@ export const enrichAnalysis = (analysis, originalText) => {
                 seen.add(key);
                 uniqueOptions.push({
                     ...m,
-                    id: key, // Simple unique ID for UI/AI reference
+                    id: m.id || key, // Use existing ID if available, else generated key
                     description: `${m.tense} (${m.dict || '?'})`
                 });
             }
