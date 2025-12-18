@@ -100,7 +100,7 @@ export const enrichAnalysis = (analysis, originalText) => {
 
         return {
             ...analysis,
-            tense: uniqueOptions.map(m => m.tense).join('/'), // Show all potential tenses
+            tense: analysis.tense ? analysis.tense : uniqueOptions.map(m => m.tense).join('/'), // Show all potential tenses or keep existing
             hon: uniqueOptions.some(m => m.hon), // True if any form is honorific
             volition: firstMatch.volition,
             // Detailed verb info for UI/AI

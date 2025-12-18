@@ -36,6 +36,14 @@ export default class AnalysisParser {
                 }
             }
 
+            if (splitIndex !== -1) {
+                pos = contentInner.substring(0, splitIndex).trim();
+                tense = contentInner.substring(splitIndex + 1).trim();
+            } else {
+                pos = contentInner.trim();
+                tense = '';
+            }
+
             // Extract ID from indexed(id:...)
             // Format: v,future,indexed(id:123456)
             // We need to look for indexed(id:...) in POS or Tense
@@ -109,9 +117,10 @@ export default class AnalysisParser {
 
         // Auto-fill verb info if missing or to enhance
         // We use the root for lookup
-        if (root) {
-            analysis = enrichAnalysis(analysis, root);
-        }
+        // Auto-fill disabled by user request. Colors/Details now determined strictly by analyzed text or explicit Polish actions.
+        // if (root) {
+        //     analysis = enrichAnalysis(analysis, root);
+        // }
 
         return analysis;
     }
