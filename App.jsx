@@ -636,6 +636,7 @@ function TibetanReaderContent() {
                                         <button onClick={() => insertRichTextBlock(blockIdx)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
                                         <button onClick={() => insertTibetanBlock(blockIdx)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
                                         <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
+                                        <button onClick={() => toggleBlockDebug(blockIdx)} className="btn-insert-small" title="Toggle Debug Mode">Debug</button>
                                     </div>
                                 </div>
                             ))}
