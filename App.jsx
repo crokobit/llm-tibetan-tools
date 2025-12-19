@@ -792,6 +792,14 @@ function TibetanReaderContent() {
                                     </div>
                                 </div>
                             )}
+                            {/* Insert controls at beginning of content */}
+                            {documentData.length > 0 && (
+                                <div className="block-insert-controls">
+                                    <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
+                                    <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
+                                    <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
+                                </div>
+                            )}
                             {documentData.map((block, blockIdx) => (
                                 <div key={blockIdx} className="block-wrapper">
                                     {/* Render block based on type */}
