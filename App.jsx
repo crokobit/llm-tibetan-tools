@@ -60,8 +60,8 @@ function TibetanReaderContent() {
         let output = '';
         documentData.forEach(block => {
             if (block.type === 'richtext') {
-                // Export rich text as HTML comment for now
-                output += '<!-- RICHTEXT:\n' + block.content + '\n-->\n\n';
+                // Export rich text with RICHTEXT tags
+                output += '<RICHTEXT>\n' + block.content + '\n</RICHTEXT>\n\n';
             } else if (block.type === 'tibetan') {
                 output += '>>>\n';
                 // Reconstruct raw text
