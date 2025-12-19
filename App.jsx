@@ -15,7 +15,7 @@ import { disambiguateVerbs } from './utils/api.js';
 
 // Internal component that uses contexts - Main Reader Content
 function TibetanReaderContent() {
-    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock } = useDocument();
+    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock, splitBlock, mergeBlocks } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
     const { selectMode, setSelectMode } = useSelection();
     const { user, token, signIn, logout, refreshSession } = useAuth();
@@ -90,8 +90,8 @@ function TibetanReaderContent() {
     const handleSaveCloud = async () => {
         if (!saveFilename) return;
         setIsSaving(true);
+        const content = JSON.stringify(documentData);
         try {
-            const content = JSON.stringify(documentData);
             await saveFile(token, saveFilename, content);
             setShowSaveDialog(false);
             showToast('File saved successfully!');
@@ -820,6 +820,7 @@ function TibetanReaderContent() {
                                             onAnalyze={handleAnalyzeBlock}
                                             isAnalyzing={block._isAnalyzing}
                                             onDelete={() => deleteBlock(blockIdx)}
+                                            onSplit={(afterLineIdx) => splitBlock(blockIdx, afterLineIdx)}
                                         />
                                     )}
 
@@ -830,6 +831,9 @@ function TibetanReaderContent() {
                                         <button onClick={() => insertTibetanBlock(blockIdx)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
                                         <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
                                         <button onClick={() => toggleBlockDebug(blockIdx)} className="btn-insert-small" title="Toggle Debug Mode">Debug</button>
+                                        {block.type === 'tibetan' && documentData[blockIdx + 1]?.type === 'tibetan' && (
+                                            <button onClick={() => mergeBlocks(blockIdx)} className="btn-insert-small btn-merge" title="Merge with next block">Merge ↓</button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

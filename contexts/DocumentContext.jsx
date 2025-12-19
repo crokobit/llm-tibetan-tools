@@ -93,6 +93,65 @@ export function DocumentProvider({ children }) {
                 newData[blockIdx] = { ...newData[blockIdx], content: newContent };
                 return newData;
             });
+        },
+        splitBlock: (blockIdx, afterLineIdx) => {
+            setDocumentData(prev => {
+                const newData = [...prev];
+                const block = newData[blockIdx];
+
+                // Only split tibetan blocks with more than 1 line
+                if (block.type !== 'tibetan' || !block.lines || block.lines.length <= 1) {
+                    return prev;
+                }
+
+                // Can't split after the last line
+                if (afterLineIdx >= block.lines.length - 1) {
+                    return prev;
+                }
+
+                // Create new block with lines after the split point
+                const newBlock = {
+                    type: 'tibetan',
+                    lines: block.lines.slice(afterLineIdx + 1)
+                };
+
+                // Update original block to only have lines up to split point
+                newData[blockIdx] = {
+                    ...block,
+                    lines: block.lines.slice(0, afterLineIdx + 1)
+                };
+
+                // Insert new block after the original
+                newData.splice(blockIdx + 1, 0, newBlock);
+
+                return newData;
+            });
+        },
+        mergeBlocks: (blockIdx) => {
+            setDocumentData(prev => {
+                const newData = [...prev];
+                const currentBlock = newData[blockIdx];
+                const nextBlock = newData[blockIdx + 1];
+
+                // Only merge if both blocks are tibetan type
+                if (!currentBlock || !nextBlock) {
+                    return prev;
+                }
+                if (currentBlock.type !== 'tibetan' || nextBlock.type !== 'tibetan') {
+                    return prev;
+                }
+
+                // Combine lines from both blocks
+                newData[blockIdx] = {
+                    ...currentBlock,
+                    lines: [...(currentBlock.lines || []), ...(nextBlock.lines || [])]
+                };
+
+                // Remove the next block
+                newData.splice(blockIdx + 1, 1);
+
+                return newData;
+            });
         }
     };
 

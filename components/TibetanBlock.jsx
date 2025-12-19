@@ -5,9 +5,10 @@ import { useAuth } from '../contexts/index.jsx';
 import { disambiguateVerbs } from '../utils/api.js';
 import { enrichAnalysis, lookupVerb } from '../utils/verbLookup.js'; // Added imports
 
-export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing, onDelete }) {
+export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing, onDelete, onSplit }) {
     const [inputText, setInputText] = React.useState('');
     const [isResolving, setIsResolving] = useState(false);
+    const [splitMenuLineIdx, setSplitMenuLineIdx] = useState(null);
     const { token } = useAuth();
 
     if (block._isInputMode) {
@@ -476,15 +477,44 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
             )}
 
             {block.lines.map((line, lineIdx) => (
-                <LineRenderer
-                    key={lineIdx}
-                    line={line}
-                    blockIdx={blockIdx}
-                    lineIdx={lineIdx}
-                    editingTarget={editingTarget}
-                    isAnyEditActive={!!editingTarget}
-                    onResize={handleResize}
-                />
+                <div key={lineIdx} className="line-wrapper">
+                    <LineRenderer
+                        line={line}
+                        blockIdx={blockIdx}
+                        lineIdx={lineIdx}
+                        editingTarget={editingTarget}
+                        isAnyEditActive={!!editingTarget}
+                        onResize={handleResize}
+                    />
+                    {/* Subtle split divider - only between lines, not after last */}
+                    {block.lines.length > 1 && lineIdx < block.lines.length - 1 && onSplit && (
+                        <div className="line-split-divider-container">
+                            <div
+                                className="line-split-divider"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSplitMenuLineIdx(splitMenuLineIdx === lineIdx ? null : lineIdx);
+                                }}
+                                title="Click to split block here"
+                            />
+                            {/* Context menu for split */}
+                            {splitMenuLineIdx === lineIdx && (
+                                <div className="split-context-menu">
+                                    <button
+                                        className="split-menu-item"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSplit(lineIdx);
+                                            setSplitMenuLineIdx(null);
+                                        }}
+                                    >
+                                        ✂ Split block here
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             ))}
             {showDebug && (
                 <DebugBlockEditor
