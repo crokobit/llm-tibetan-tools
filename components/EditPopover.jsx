@@ -524,30 +524,7 @@ const EditPopover = () => {
                             Polished
                         </span>
                     ))}
-                    <button
-                        className="btn-toggle-def"
-                        onClick={() => setShowDefinitions(!showDefinitions)}
-                        title="Toggle Dictionary Definition"
-                        style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2em' }}
-                    >
-                        {showDefinitions ? '👁️' : '👁️‍🗨️'}
-                    </button>
                 </div>
-
-                {/* Dictionary Definition Display */}
-                {showDefinitions && details && details.length > 0 && (
-                    <div className="verb-def-hint" style={{
-                        marginTop: '8px',
-                        padding: '8px',
-                        background: '#f8f9fa',
-                        borderRadius: '4px',
-                        fontSize: '0.85rem',
-                        color: '#4b5563',
-                        border: '1px solid #e5e7eb'
-                    }}>
-                        <strong>Dict:</strong> {details[0].definition}
-                    </div>
-                )}
             </div>
         );
     };
@@ -729,11 +706,38 @@ const EditPopover = () => {
             <div className={`popover-arrow ${placement === 'bottom' ? 'bottom' : 'top'}`}></div>
 
             <div className="popover-content">
-                {/* Text Display */}
-                <div className="text-display">
-                    {formData.text || '(no text)'}
+                {/* Action Buttons - Moved to top */}
+                <div className="popover-actions">
+                    <button
+                        onClick={handleSave}
+                        className="btn-save"
+                        disabled={startNode.length === 0 || (operator !== 'single' && endNode.length === 0)}
+                    >
+                        Save
+                    </button>
+                    {!isCreating && (
+                        <button onClick={handleDeleteAnalysis} className="btn-delete">Delete</button>
+                    )}
+                    <button
+                        className="btn-toggle-def"
+                        onClick={() => setShowDefinitions(!showDefinitions)}
+                        title="Toggle Dictionary Definition"
+                        style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2em' }}
+                    >
+                        {showDefinitions ? '👁️' : '👁️‍🗨️'}
+                    </button>
                 </div>
 
+                {/* Definition - Moved below save/delete */}
+                <textarea
+                    className="form-input form-input-sm"
+                    rows={2}
+                    value={formData.definition}
+                    onChange={e => setFormData({ ...formData, definition: e.target.value })}
+                    placeholder="Definition"
+                />
+
+                {/* Text Display */}
                 <VerbSelector />
 
                 {/* POS Selection */}
@@ -798,14 +802,6 @@ const EditPopover = () => {
                     {getPreviewText()}
                 </div>
 
-                {/* Root */}
-                <input
-                    className="form-input"
-                    value={formData.root}
-                    onChange={e => setFormData({ ...formData, root: e.target.value, verbId: null })}
-                    placeholder="Root"
-                />
-
                 {/* Volls */}
                 <input
                     className="form-input form-input-sm"
@@ -814,39 +810,50 @@ const EditPopover = () => {
                     placeholder="Full form"
                 />
 
-                {/* Definition */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label" style={{ fontSize: '0.75rem', color: '#666', marginBottom: '2px' }}>Definition</label>
-                    {data?.analysis?.verbDetails && data.analysis.verbDetails.length > 0 && (
-                        <span
-                            title={`Dictionary: ${data.analysis.verbDetails[0].definition}`}
-                            style={{ fontSize: '0.8rem', cursor: 'help', color: '#8b5cf6' }}
-                        >
-                            📚 Hint
-                        </span>
-                    )}
-                </div>
-                <textarea
-                    className="form-input form-input-sm"
-                    rows={2}
-                    value={formData.definition}
-                    onChange={e => setFormData({ ...formData, definition: e.target.value })}
-                    placeholder="Definition"
+                {/* Root - Moved to bottom */}
+                <input
+                    className="form-input"
+                    value={formData.root}
+                    onChange={e => setFormData({ ...formData, root: e.target.value, verbId: null })}
+                    placeholder="Root"
                 />
-            </div>
 
-            {/* Footer */}
-            <div className="popover-footer">
-                {!isCreating ? (
-                    <button onClick={handleDeleteAnalysis} className="btn-delete">Delete</button>
-                ) : <span></span>}
-                <button
-                    onClick={handleSave}
-                    className="btn-save"
-                    disabled={startNode.length === 0 || (operator !== 'single' && endNode.length === 0)}
-                >
-                    Save
-                </button>
+                {/* Dictionary Definition Hint - shown when toggle is active */}
+                {showDefinitions && (() => {
+                    const details = getVerbDetails();
+                    if (details && details.length > 0) {
+                        return (
+                            <div className="verb-def-hint" style={{
+                                marginTop: '4px',
+                                padding: '8px',
+                                background: '#f8f9fa',
+                                borderRadius: '4px',
+                                fontSize: '0.85rem',
+                                color: '#4b5563',
+                                border: '1px solid #e5e7eb'
+                            }}>
+                                <strong>Dict:</strong> {details[0].definition}
+                            </div>
+                        );
+                    }
+                    return null;
+                })()}
+
+                {/* Verb Tenses Display - shown when definition toggle is active */}
+                {showDefinitions && (() => {
+                    const details = getVerbDetails();
+                    if (details && details.length > 0) {
+                        const verb = details[0];
+                        return (
+                            <div className="verb-tenses-display">
+                                {verb.past && <span className="tense-item">Past: {verb.past}</span>}
+                                {verb.future && <span className="tense-item">Fut: {verb.future}</span>}
+                                {verb.imperative && <span className="tense-item">Imp: {verb.imperative}</span>}
+                            </div>
+                        );
+                    }
+                    return null;
+                })()}
             </div>
         </div>
     );
