@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/index.jsx';
 import { disambiguateVerbs } from '../utils/api.js';
 import { enrichAnalysis, lookupVerb } from '../utils/verbLookup.js'; // Added imports
 
-export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing }) {
+export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing, onDelete }) {
     const [inputText, setInputText] = React.useState('');
     const [isResolving, setIsResolving] = useState(false);
     const { token } = useAuth();
@@ -13,6 +13,16 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
     if (block._isInputMode) {
         return (
             <div className="tibetan-input-block p-4 border rounded-lg bg-white shadow-sm">
+                <div className="tibetan-input-header">
+                    <span className="tibetan-input-label">Tibetan Input</span>
+                    <button
+                        className="btn-delete-block"
+                        onClick={onDelete}
+                        title="Delete this block"
+                    >
+                        ✕
+                    </button>
+                </div>
                 <textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}

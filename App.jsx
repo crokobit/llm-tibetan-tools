@@ -819,6 +819,7 @@ function TibetanReaderContent() {
                                             showDebug={showDebug || block._showDebug}
                                             onAnalyze={handleAnalyzeBlock}
                                             isAnalyzing={block._isAnalyzing}
+                                            onDelete={() => deleteBlock(blockIdx)}
                                         />
                                     )}
 

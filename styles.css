@@ -1508,6 +1508,25 @@ body {
     color: #dc2626;
 }
 
+/* Tibetan Input Block Styles */
+.tibetan-input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    margin: -1rem -1rem 1rem -1rem;
+}
+
+.tibetan-input-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 /* Quill Editor Overrides */
 .rich-text-block .ql-container {
     font-family: inherit;
