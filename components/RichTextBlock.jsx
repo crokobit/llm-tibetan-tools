@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import ReactQuill from 'react-quill';
 
 const RichTextBlock = ({ content, onChange, onDelete, blockIdx }) => {
+    const quillRef = useRef(null);
     const modules = {
         toolbar: [
             [{ 'header': [1, 2, 3, false] }],
@@ -34,6 +35,7 @@ const RichTextBlock = ({ content, onChange, onDelete, blockIdx }) => {
                 </button>
             </div>
             <ReactQuill
+                ref={quillRef}
                 theme="snow"
                 value={content}
                 onChange={onChange}
