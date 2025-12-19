@@ -687,12 +687,6 @@ function TibetanReaderContent() {
                             {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
                         </button>
                     )}
-                    <button
-                        onClick={() => setShowPasteModal(true)}
-                        className="btn-export toolbar-btn-spacing"
-                    >
-                        Add analyzed text
-                    </button>
 
                     {saveFilename ? (
                         <div className="file-input-custom filename-container">
