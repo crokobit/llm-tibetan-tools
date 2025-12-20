@@ -822,6 +822,12 @@ const EditPopover = () => {
                 {showDefinitions && (() => {
                     const details = getVerbDetails();
                     if (details && details.length > 0) {
+                        // FIX: Use the currently selected verbId if available
+                        const currentVerbId = formData.verbId || data?.analysis?.verbId;
+                        const verb = currentVerbId
+                            ? details.find(d => d.id === currentVerbId) || details[0]
+                            : details[0];
+
                         return (
                             <div className="verb-def-hint" style={{
                                 marginTop: '4px',
@@ -832,7 +838,7 @@ const EditPopover = () => {
                                 color: '#4b5563',
                                 border: '1px solid #e5e7eb'
                             }}>
-                                <strong>Dict:</strong> {details[0].definition}
+                                <strong>Dict:</strong> {verb.definition}
                             </div>
                         );
                     }
@@ -843,7 +849,12 @@ const EditPopover = () => {
                 {showDefinitions && (() => {
                     const details = getVerbDetails();
                     if (details && details.length > 0) {
-                        const verb = details[0];
+                        // FIX: Use the currently selected verbId if available
+                        const currentVerbId = formData.verbId || data?.analysis?.verbId;
+                        const verb = currentVerbId
+                            ? details.find(d => d.id === currentVerbId) || details[0]
+                            : details[0];
+
                         return (
                             <div className="verb-tenses-display">
                                 {verb.past && <span className="tense-item">Past: {verb.past}</span>}
