@@ -2146,3 +2146,70 @@ body.resizing-active {
     border-color: #3b82f6;
     /* blue-500 */
 }
+
+/* TibetanBlock Edit Text Mode */
+.tibetan-edit-container {
+    padding: 1rem;
+    border: 2px dashed #3b82f6;
+    border-radius: 0.5rem;
+    background-color: #f0f9ff;
+    outline: none;
+    min-height: 100px;
+}
+
+.tibetan-edit-container:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.editable-line {
+    margin: 0.5rem 0;
+    line-height: 2;
+}
+
+.editable-text {
+    /* Inherits tibetan-font styles, no additional styling needed */
+    display: inline;
+}
+
+.word-island {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.25rem;
+    padding: 2px 4px;
+    margin: 0 2px;
+    user-select: none;
+    vertical-align: baseline;
+}
+
+.word-card-static {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.word-card-static-underline {
+    width: 100%;
+    height: 3px;
+    margin: 2px 0;
+    border-bottom-width: 3px;
+    border-bottom-style: solid;
+}
+
+.word-card-static-root {
+    font-size: 0.75rem;
+    color: #4b5563;
+    font-weight: 500;
+}
+
+.word-card-static-def {
+    font-size: 0.625rem;
+    color: #6b7280;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

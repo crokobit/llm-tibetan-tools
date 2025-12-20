@@ -1,14 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import LineRenderer from './LineRenderer.jsx';
 import DebugBlockEditor from './DebugBlockEditor.jsx';
 import { useAuth } from '../contexts/index.jsx';
 import { disambiguateVerbs } from '../utils/api.js';
-import { enrichAnalysis, lookupVerb } from '../utils/verbLookup.js'; // Added imports
+import { enrichAnalysis, lookupVerb } from '../utils/verbLookup.js';
+import { POS_COLORS, FONT_SIZES } from '../utils/constants.js';
+import { truncateDefinition } from '../utils/helpers.js';
+
+// Helper to extract POS key for coloring
+const getPosKey = (pos) => {
+    if (!pos) return 'other';
+    let p = pos.toLowerCase();
+    if (p.includes('->') || p.includes('→')) {
+        const parts = p.split(/->|→/);
+        if (parts.length > 1) p = parts[1];
+    }
+    return p.split(/[\->|,]/)[0].replace(/[()]/g, '').trim() || 'other';
+};
+
+// Static WordCard for edit mode - simplified HTML rendering (no click handlers)
+const WordCardStatic = ({ unit }) => {
+    const { analysis, original, nestedData } = unit;
+    const posKey = getPosKey(analysis?.pos);
+    const borderColor = POS_COLORS[posKey] || POS_COLORS.other;
+
+    // Render nested parts or just original
+    const textParts = nestedData?.length > 0
+        ? nestedData.map(n => n.original).join('')
+        : original;
+
+    return (
+        <span className="word-card-static">
+            <span className={`tibetan-font ${FONT_SIZES.tibetan}`}>{textParts}</span>
+            <span className={`word-card-static-underline ${borderColor}`}></span>
+            <span className="word-card-static-root">{analysis?.root}</span>
+            <span className="word-card-static-def">{truncateDefinition(analysis?.definition)}</span>
+        </span>
+    );
+};
 
 export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing, onDelete, onSplit }) {
     const [inputText, setInputText] = React.useState('');
     const [isResolving, setIsResolving] = useState(false);
     const [splitMenuLineIdx, setSplitMenuLineIdx] = useState(null);
+    const [isTextEditMode, setIsTextEditMode] = useState(false);
+    const editableRef = useRef(null);
     const { token } = useAuth();
 
     if (block._isInputMode) {
@@ -260,6 +296,106 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
 
     const verbsToPolishCount = getVerbsToPolish().length;
 
+    // Handle exit from edit text mode - parse DOM and sync data
+    const handleExitEditMode = () => {
+        if (!editableRef.current) {
+            setIsTextEditMode(false);
+            return;
+        }
+
+        const newBlock = JSON.parse(JSON.stringify(block));
+        const newLines = [];
+
+        // Parse each line div
+        const lineDivs = editableRef.current.querySelectorAll('.editable-line');
+        lineDivs.forEach((lineDiv) => {
+            const units = [];
+            lineDiv.childNodes.forEach((node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    // Plain text - new unanalyzed text
+                    const text = node.textContent;
+                    if (text) {
+                        units.push({ type: 'text', original: text });
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Check if it's a WordCard (analyzed word)
+                    const wordData = node.dataset.wordData;
+                    if (wordData) {
+                        try {
+                            const parsed = JSON.parse(wordData);
+                            units.push(parsed);
+                        } catch (e) {
+                            // Fallback to text
+                            units.push({ type: 'text', original: node.textContent });
+                        }
+                    } else {
+                        // Other elements become text
+                        const text = node.textContent;
+                        if (text) {
+                            units.push({ type: 'text', original: text });
+                        }
+                    }
+                }
+            });
+
+            // Merge adjacent text units
+            const mergedUnits = [];
+            units.forEach((u) => {
+                if (mergedUnits.length > 0 &&
+                    mergedUnits[mergedUnits.length - 1].type === 'text' &&
+                    u.type === 'text') {
+                    mergedUnits[mergedUnits.length - 1].original += u.original;
+                } else if (u.original || u.type !== 'text') {
+                    mergedUnits.push(u);
+                }
+            });
+
+            if (mergedUnits.length > 0) {
+                newLines.push({ units: mergedUnits });
+            }
+        });
+
+        // If no lines parsed, keep at least one empty line
+        if (newLines.length === 0) {
+            newLines.push({ units: [] });
+        }
+
+        newBlock.lines = newLines;
+        onUpdate(blockIdx, newBlock);
+        setIsTextEditMode(false);
+    };
+
+    // Render content for edit mode
+    const renderEditableContent = () => {
+        return block.lines.map((line, lineIdx) => (
+            <div key={lineIdx} className="editable-line">
+                {line.units.map((unit, unitIdx) => {
+                    if (unit.type === 'text') {
+                        // Editable text span - just render the text directly
+                        return (
+                            <span key={unitIdx} className={`editable-text tibetan-font ${FONT_SIZES.tibetan}`}>
+                                {unit.original}
+                            </span>
+                        );
+                    } else {
+                        // Non-editable WordCard island
+                        return (
+                            <span
+                                key={unitIdx}
+                                className="word-island"
+                                contentEditable={false}
+                                data-word-data={JSON.stringify(unit)}
+                            >
+                                <WordCardStatic unit={unit} />
+                            </span>
+                        );
+                    }
+                })}
+            </div>
+        ));
+    };
+
+
     const handleResize = (lineIdx, unitIdx, direction) => {
         // Create a deep copy of the block to modify
         const newBlock = JSON.parse(JSON.stringify(block));
@@ -455,67 +591,91 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
     return (
         <div className="block-layout">
             {/* Block Toolbar */}
-            {!block._isInputMode && verbsToPolishCount > 0 && (
-                <div className="flex justify-end mb-2 px-2">
+            {!block._isInputMode && (
+                <div className="flex justify-end mb-2 px-2 gap-2">
                     <button
-                        onClick={handleResolveVerbs}
-                        disabled={isResolving}
-                        className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded hover:bg-indigo-200 transition-colors flex items-center gap-2"
-                        title={`Found ${verbsToPolishCount} verbs to polish`}
+                        onClick={() => isTextEditMode ? handleExitEditMode() : setIsTextEditMode(true)}
+                        className={`px-3 py-1 text-sm rounded transition-colors flex items-center gap-2 ${isTextEditMode
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
                     >
-                        {isResolving ? (
-                            <>
-                                <span className="animate-spin text-lg">⟳</span> Polishing...
-                            </>
-                        ) : (
-                            <>
-                                <span>✨</span> Polish Verbs (AI) ({verbsToPolishCount})
-                            </>
-                        )}
+                        {isTextEditMode ? '✓ Done Editing' : '✏️ Edit Text'}
                     </button>
+                    {verbsToPolishCount > 0 && (
+                        <button
+                            onClick={handleResolveVerbs}
+                            disabled={isResolving || isTextEditMode}
+                            className={`px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded hover:bg-indigo-200 transition-colors flex items-center gap-2 ${isTextEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={`Found ${verbsToPolishCount} verbs to polish`}
+                        >
+                            {isResolving ? (
+                                <>
+                                    <span className="animate-spin text-lg">⟳</span> Polishing...
+                                </>
+                            ) : (
+                                <>
+                                    <span>✨</span> Polish Verbs (AI) ({verbsToPolishCount})
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             )}
 
-            {block.lines.map((line, lineIdx) => (
-                <div key={lineIdx} className="line-wrapper">
-                    <LineRenderer
-                        line={line}
-                        blockIdx={blockIdx}
-                        lineIdx={lineIdx}
-                        editingTarget={editingTarget}
-                        isAnyEditActive={!!editingTarget}
-                        onResize={handleResize}
-                    />
-                    {/* Subtle split divider - only between lines, not after last */}
-                    {block.lines.length > 1 && lineIdx < block.lines.length - 1 && onSplit && (
-                        <div className="line-split-divider-container">
-                            <div
-                                className="line-split-divider"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSplitMenuLineIdx(splitMenuLineIdx === lineIdx ? null : lineIdx);
-                                }}
-                                title="Click to split block here"
-                            />
-                            {/* Context menu for split */}
-                            {splitMenuLineIdx === lineIdx && (
-                                <div className="split-context-menu">
-                                    <button
-                                        className="split-menu-item"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSplit(lineIdx);
-                                            setSplitMenuLineIdx(null);
-                                        }}
-                                    >
-                                        ✂ Split block here
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
+            {/* Edit Mode View */}
+            {isTextEditMode ? (
+                <div
+                    ref={editableRef}
+                    className="tibetan-edit-container"
+                    contentEditable={true}
+                    suppressContentEditableWarning={true}
+                >
+                    {renderEditableContent()}
                 </div>
-            ))}
+            ) : (
+                /* Normal View Mode */
+                block.lines.map((line, lineIdx) => (
+                    <div key={lineIdx} className="line-wrapper">
+                        <LineRenderer
+                            line={line}
+                            blockIdx={blockIdx}
+                            lineIdx={lineIdx}
+                            editingTarget={editingTarget}
+                            isAnyEditActive={!!editingTarget}
+                            onResize={handleResize}
+                        />
+                        {/* Subtle split divider - only between lines, not after last */}
+                        {block.lines.length > 1 && lineIdx < block.lines.length - 1 && onSplit && (
+                            <div className="line-split-divider-container">
+                                <div
+                                    className="line-split-divider"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSplitMenuLineIdx(splitMenuLineIdx === lineIdx ? null : lineIdx);
+                                    }}
+                                    title="Click to split block here"
+                                />
+                                {/* Context menu for split */}
+                                {splitMenuLineIdx === lineIdx && (
+                                    <div className="split-context-menu">
+                                        <button
+                                            className="split-menu-item"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onSplit(lineIdx);
+                                                setSplitMenuLineIdx(null);
+                                            }}
+                                        >
+                                            ✂ Split block here
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ))
+            )}
             {showDebug && (
                 <DebugBlockEditor
                     block={block}
