@@ -6,7 +6,7 @@ const SelectionContext = createContext();
 
 export function SelectionProvider({ children }) {
     const { documentData } = useDocument();
-    const { setEditingTarget, setAnchorRect } = useEdit(); // Need this to trigger analysis creation
+    const { setEditingTarget, setAnchorRect, editingTarget } = useEdit(); // Need this to trigger analysis creation
     const [selectionRange, setSelectionRange] = useState(null);
     const [selectMode, setSelectMode] = useState(false);
 
@@ -363,45 +363,54 @@ export function SelectionProvider({ children }) {
     // Handle Copy Event to remove newlines and exclude analysis text
     useEffect(() => {
         const handleCopy = (e) => {
+            let textToCopy = '';
+
+            // 1. Try Native Selection
             const selection = window.getSelection();
-            if (!selection || selection.isCollapsed) return;
+            if (selection && !selection.isCollapsed) {
+                // We need to filter out the analysis text which might be included in the selection
+                // 1. Clone the selected content
+                const range = selection.getRangeAt(0);
+                const fragment = range.cloneContents();
 
-            // We need to filter out the analysis text which might be included in the selection
-            // 1. Clone the selected content
-            const range = selection.getRangeAt(0);
-            const fragment = range.cloneContents();
+                // 2. Create a temporary container
+                const div = document.createElement('div');
+                div.appendChild(fragment);
 
-            // 2. Create a temporary container
-            const div = document.createElement('div');
-            div.appendChild(fragment);
+                // 3. Remove analysis elements
+                // We target the classes used for analysis containers and text
+                const analysisSelectors = [
+                    '.main-analysis-box',
+                    '.sub-analysis-cell',
+                    '.analysis-label',
+                    '.analysis-def',
+                    '.tense-label'
+                ];
 
-            // 3. Remove analysis elements
-            // We target the classes used for analysis containers and text
-            const analysisSelectors = [
-                '.main-analysis-box',
-                '.sub-analysis-cell',
-                '.analysis-label',
-                '.analysis-def',
-                '.tense-label'
-            ];
+                div.querySelectorAll(analysisSelectors.join(', ')).forEach(el => el.remove());
 
-            div.querySelectorAll(analysisSelectors.join(', ')).forEach(el => el.remove());
+                // 4. Get text content
+                const text = div.textContent || div.innerText;
 
-            // 4. Get text content
-            const text = div.textContent || div.innerText;
+                // 5. Remove newlines
+                textToCopy = text.replace(/[\r\n]+/g, '');
+            }
 
-            // 5. Remove newlines
-            const cleanedText = text.replace(/[\r\n]+/g, '');
+            // 2. Fallback to Custom Editing Selection (Green Highlight)
+            // If native selection failed (likely cleared by UI update), use the stored selection state
+            if (!textToCopy && editingTarget && editingTarget.creationDetails && editingTarget.creationDetails.selectedText) {
+                textToCopy = editingTarget.creationDetails.selectedText;
+            }
 
-            if (cleanedText) {
+            if (textToCopy) {
                 e.preventDefault();
-                e.clipboardData.setData('text/plain', cleanedText);
+                e.clipboardData.setData('text/plain', textToCopy);
             }
         };
 
         document.addEventListener('copy', handleCopy);
         return () => document.removeEventListener('copy', handleCopy);
-    }, []);
+    }, [editingTarget]);
 
     const value = {
         selectionRange,
