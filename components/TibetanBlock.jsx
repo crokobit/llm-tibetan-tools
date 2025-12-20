@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import LineRenderer from './LineRenderer.jsx';
 import DebugBlockEditor from './DebugBlockEditor.jsx';
 import { useAuth } from '../contexts/index.jsx';
@@ -39,17 +39,25 @@ const WordCardStatic = ({ unit }) => {
     );
 };
 
-export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing, onDelete, onSplit }) {
+export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget, showDebug, onAnalyze, isAnalyzing, onDelete, onSplit, onToggleDebug }) {
     const [inputText, setInputText] = React.useState('');
     const [isResolving, setIsResolving] = useState(false);
     const [splitMenuLineIdx, setSplitMenuLineIdx] = useState(null);
     const [isTextEditMode, setIsTextEditMode] = useState(false);
+    const [contextMenu, setContextMenu] = useState(null); // { x, y, lineIdx }
     const editableRef = useRef(null);
     const { token } = useAuth();
 
+    // Close context menu on click outside
+    useEffect(() => {
+        const handleClickOutside = () => setContextMenu(null);
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
+
     if (block._isInputMode) {
         return (
-            <div className="tibetan-input-block p-4 border rounded-lg bg-white shadow-sm">
+            <div className="tibetan-input-block">
                 <div className="tibetan-input-header">
                     <span className="tibetan-input-label">Tibetan Input</span>
                     <button
@@ -64,14 +72,14 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     placeholder="Paste Tibetan text here..."
-                    className="w-full h-32 p-3 border rounded mb-3 font-tibetan text-lg"
+                    className="tibetan-input-textarea tibetan-font"
                     disabled={isAnalyzing}
                 />
-                <div className="flex justify-end">
+                <div className="input-actions">
                     <button
                         onClick={() => onAnalyze(blockIdx, inputText)}
                         disabled={!inputText.trim() || isAnalyzing}
-                        className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                        className="btn-analyze"
                     >
                         {isAnalyzing ? 'Analyzing...' : 'ANALYSIS'}
                     </button>
@@ -588,55 +596,92 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
         onUpdate(blockIdx, newBlock);
     };
 
+    const handleContextMenu = (e, lineIdx) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            lineIdx
+        });
+    };
+
     return (
         <div className="block-layout">
-            {/* Block Toolbar */}
-            {!block._isInputMode && (
-                <div className="flex justify-end mb-2 px-2 gap-2">
+
+            {/* NO TOOLBAR */}
+
+            {/* Context Menu Overlay */}
+            {contextMenu && (
+                <div
+                    className="context-menu-container"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <button
-                        onClick={() => isTextEditMode ? handleExitEditMode() : setIsTextEditMode(true)}
-                        className={`px-3 py-1 text-sm rounded transition-colors flex items-center gap-2 ${isTextEditMode
-                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                        className="context-menu-item"
+                        onClick={() => {
+                            handleResolveVerbs();
+                            setContextMenu(null);
+                        }}
+                        disabled={verbsToPolishCount === 0 || isResolving}
+                        title={verbsToPolishCount === 0 ? "No ambiguous verbs to polish" : ""}
                     >
-                        {isTextEditMode ? '✓ Done Editing' : '✏️ Edit Text'}
+                        {isResolving ? 'Polishing...' : `Polish verbs (AI) ${verbsToPolishCount > 0 ? `(${verbsToPolishCount})` : ''}`}
                     </button>
-                    {verbsToPolishCount > 0 && (
-                        <button
-                            onClick={handleResolveVerbs}
-                            disabled={isResolving || isTextEditMode}
-                            className={`px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded hover:bg-indigo-200 transition-colors flex items-center gap-2 ${isTextEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={`Found ${verbsToPolishCount} verbs to polish`}
-                        >
-                            {isResolving ? (
-                                <>
-                                    <span className="animate-spin text-lg">⟳</span> Polishing...
-                                </>
-                            ) : (
-                                <>
-                                    <span>✨</span> Polish Verbs (AI) ({verbsToPolishCount})
-                                </>
-                            )}
+                    <button className="context-menu-item" onClick={() => {
+                        if (isTextEditMode) handleExitEditMode();
+                        else setIsTextEditMode(true);
+                        setContextMenu(null);
+                    }}>
+                        {isTextEditMode ? 'Done Editing' : 'Edit Text'}
+                    </button>
+                    {onToggleDebug && (
+                        <button className="context-menu-item" onClick={() => {
+                            onToggleDebug();
+                            setContextMenu(null);
+                        }}>
+                            Debug
                         </button>
                     )}
                 </div>
             )}
 
-            {/* Edit Mode View */}
+
             {isTextEditMode ? (
-                <div
-                    ref={editableRef}
-                    className="tibetan-edit-container"
-                    contentEditable={true}
-                    suppressContentEditableWarning={true}
-                >
-                    {renderEditableContent()}
-                </div>
+                <>
+                    {/* Floating Done Button for edit mode */}
+                    <div className="edit-mode-controls">
+                        <button
+                            onClick={handleExitEditMode}
+                            className="btn-done-editing"
+                        >
+                            ✓ Done Editing
+                        </button>
+                    </div>
+                    <div
+                        ref={editableRef}
+                        className="tibetan-edit-container"
+                        contentEditable={true}
+                        suppressContentEditableWarning={true}
+                    >
+                        {renderEditableContent()}
+                    </div>
+                </>
             ) : (
                 /* Normal View Mode */
                 block.lines.map((line, lineIdx) => (
                     <div key={lineIdx} className="line-wrapper">
+                        {/* Line Handle */}
+                        <div
+                            className="line-head-handle"
+                            title="Click for options"
+                            onClick={(e) => handleContextMenu(e, lineIdx)}
+                            onContextMenu={(e) => handleContextMenu(e, lineIdx)}
+                        >
+                            ⋮
+                        </div>
+
                         <LineRenderer
                             line={line}
                             blockIdx={blockIdx}
@@ -663,11 +708,21 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                                             className="split-menu-item"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                onSplit(lineIdx);
+                                                onSplit(lineIdx, 'text');
                                                 setSplitMenuLineIdx(null);
                                             }}
                                         >
-                                            ✂ Split block here
+                                            + Text
+                                        </button>
+                                        <button
+                                            className="split-menu-item"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onSplit(lineIdx, 'analyzed');
+                                                setSplitMenuLineIdx(null);
+                                            }}
+                                        >
+                                            + Analyzed Text
                                         </button>
                                     </div>
                                 )}

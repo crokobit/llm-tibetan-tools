@@ -31,6 +31,7 @@ function TibetanReaderContent() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [notification, setNotification] = useState(null);
     const [isPolishing, setIsPolishing] = useState(false);
+    const [pasteInsertIndex, setPasteInsertIndex] = useState(-1); // -1 determines insertion at end
     const contentRef = useRef(null);
     const ignoreClickRef = useRef(false);
 
@@ -543,13 +544,40 @@ function TibetanReaderContent() {
                 showToast('No valid blocks found in text.');
                 return;
             }
-            setDocumentData(prev => [...prev, ...newBlocks]);
+
+            setDocumentData(prev => {
+                const newData = [...prev];
+                if (pasteInsertIndex === -1) {
+                    return [...newData, ...newBlocks];
+                } else {
+                    newData.splice(pasteInsertIndex + 1, 0, ...newBlocks);
+                    return newData;
+                }
+            });
             setShowDebug(false);
             setShowPasteModal(false);
+            setPasteInsertIndex(-1);
             showToast('Text imported successfully!');
         } catch (error) {
             console.error(error);
             showToast('Failed to parse text: ' + error.message);
+        }
+    };
+
+    const handleSplit = (blockIdx, afterLineIdx, type) => {
+        const block = documentData[blockIdx];
+        const isLastLine = afterLineIdx === block.lines.length - 1;
+
+        // If not splitting at the very end, we need to split the block first
+        if (!isLastLine) {
+            splitBlock(blockIdx, afterLineIdx);
+        }
+
+        if (type === 'text') {
+            insertRichTextBlock(blockIdx);
+        } else if (type === 'analyzed') {
+            setPasteInsertIndex(blockIdx);
+            setShowPasteModal(true);
         }
     };
 
@@ -820,23 +848,24 @@ function TibetanReaderContent() {
                                             onAnalyze={handleAnalyzeBlock}
                                             isAnalyzing={block._isAnalyzing}
                                             onDelete={() => deleteBlock(blockIdx)}
-                                            onSplit={(afterLineIdx) => splitBlock(blockIdx, afterLineIdx)}
+                                            onSplit={handleSplit}
+                                            onToggleDebug={() => toggleBlockDebug(blockIdx)}
                                         />
                                     )}
 
                                     {/* Insert buttons after each block */}
-                                    <div className="block-insert-controls">
-
-                                        <button onClick={() => insertRichTextBlock(blockIdx)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
-                                        <button onClick={() => insertTibetanBlock(blockIdx)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
-                                        <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
-                                        <button onClick={() => toggleBlockDebug(blockIdx)} className="btn-insert-small" title="Toggle Debug Mode">Debug</button>
-                                        {block.type === 'tibetan' && documentData[blockIdx + 1]?.type === 'tibetan' && (
-                                            <button onClick={() => mergeBlocks(blockIdx)} className="btn-insert-small btn-merge" title="Merge with next block">Merge ↓</button>
-                                        )}
-                                    </div>
+                                    {/* Insert buttons after each block REMOVED - Continuous Text Flow */}
                                 </div>
                             ))}
+
+                            {/* Append Controls at the very end */}
+                            <div className="block-insert-controls block-insert-controls-end" style={{ marginTop: '20px', justifyContent: 'center', opacity: 1 }}>
+                                <div className="divider-line" style={{ width: '100%', borderTop: '1px dashed #e5e7eb', marginBottom: '10px' }}></div>
+                                <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Append Rich Text Block">+ Text</button>
+                                <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Append Tibetan Block">+ Tibetan</button>
+                                <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Append Analyzed Text">+ Analyzed Text</button>
+                            </div>
+
                         </>
                     )}
                 </div>
