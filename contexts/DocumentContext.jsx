@@ -12,6 +12,7 @@ export function DocumentProvider({ children }) {
     const [loading, setLoading] = useState(false);
     const [isMammothLoaded, setIsMammothLoaded] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
+    const [showBlocks, setShowBlocks] = useState(false);
     const [rawText, setRawText] = useState('');
 
     const handleFileUpload = async (e) => {
@@ -60,7 +61,10 @@ export function DocumentProvider({ children }) {
         setIsMammothLoaded,
         handleFileUpload,
         showDebug,
+        showDebug,
         setShowDebug,
+        showBlocks,
+        setShowBlocks,
         rawText,
         // Block manipulation helpers
         insertRichTextBlock: (afterIdx) => {

@@ -59,6 +59,13 @@ body {
     border-bottom: none;
 }
 
+/* Optional Block Visibility */
+.block-wrapper.block-visible {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
 .block-container:last-child {
     border-bottom: none;
 }
@@ -1410,7 +1417,6 @@ body {
 .content-area {
     padding: 2rem;
     /* p-8 */
-    min-height: 500px;
 }
 
 /* Loading Spinner */
@@ -2241,16 +2247,24 @@ body.resizing-active {
 .line-wrapper {
     position: relative;
     padding-left: 24px;
-    /* Make space for handle */
+    /* Keeping indentation for visual consistency even with handle moved */
 }
 
 /* Line Head Handle */
+
+.block-layout {
+    position: relative;
+    /* To contain the block handle */
+}
+
+/* Line Head Handle - now Block Head Handle */
 .line-head-handle {
     position: absolute;
     left: 4px;
     top: 0;
     bottom: 0;
     width: 20px;
+    height: auto;
     cursor: pointer;
     opacity: 0;
     display: flex;
@@ -2259,9 +2273,10 @@ body.resizing-active {
     color: #9ca3af;
     font-size: 14px;
     user-select: none;
+    z-index: 10;
 }
 
-.line-wrapper:hover .line-head-handle {
+.block-layout:hover .line-head-handle {
     opacity: 1;
 }
 

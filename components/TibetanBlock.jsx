@@ -670,66 +670,70 @@ export default function TibetanBlock({ block, blockIdx, onUpdate, editingTarget,
                 </>
             ) : (
                 /* Normal View Mode */
-                block.lines.map((line, lineIdx) => (
-                    <div key={lineIdx} className="line-wrapper">
-                        {/* Line Handle */}
-                        <div
-                            className="line-head-handle"
-                            title="Click for options"
-                            onClick={(e) => handleContextMenu(e, lineIdx)}
-                            onContextMenu={(e) => handleContextMenu(e, lineIdx)}
-                        >
-                            ⋮
-                        </div>
+                /* Normal View Mode */
+                [
+                    // Render Handle once at block level
+                    <div
+                        key="block-handle"
+                        className="line-head-handle"
+                        title="Click for options"
+                        onClick={(e) => handleContextMenu(e, 0)}
+                        onContextMenu={(e) => handleContextMenu(e, 0)}
+                    >
+                        ⋮
+                    </div>,
+                    ...block.lines.map((line, lineIdx) => (
+                        <div key={lineIdx} className="line-wrapper">
 
-                        <LineRenderer
-                            line={line}
-                            blockIdx={blockIdx}
-                            lineIdx={lineIdx}
-                            editingTarget={editingTarget}
-                            isAnyEditActive={!!editingTarget}
-                            onResize={handleResize}
-                        />
-                        {/* Subtle split divider - only between lines, not after last */}
-                        {block.lines.length > 1 && lineIdx < block.lines.length - 1 && onSplit && (
-                            <div className="line-split-divider-container">
-                                <div
-                                    className="line-split-divider"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSplitMenuLineIdx(splitMenuLineIdx === lineIdx ? null : lineIdx);
-                                    }}
-                                    title="Click to split block here"
-                                />
-                                {/* Context menu for split */}
-                                {splitMenuLineIdx === lineIdx && (
-                                    <div className="split-context-menu">
-                                        <button
-                                            className="split-menu-item"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onSplit(lineIdx, 'text');
-                                                setSplitMenuLineIdx(null);
-                                            }}
-                                        >
-                                            + Text
-                                        </button>
-                                        <button
-                                            className="split-menu-item"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onSplit(lineIdx, 'analyzed');
-                                                setSplitMenuLineIdx(null);
-                                            }}
-                                        >
-                                            + Analyzed Text
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ))
+                            <LineRenderer
+                                line={line}
+                                blockIdx={blockIdx}
+                                lineIdx={lineIdx}
+                                editingTarget={editingTarget}
+                                isAnyEditActive={!!editingTarget}
+                                onResize={handleResize}
+                            />
+                            {/* Subtle split divider - only between lines, not after last */}
+                            {block.lines.length > 1 && lineIdx < block.lines.length - 1 && onSplit && (
+                                <div className="line-split-divider-container">
+                                    <div
+                                        className="line-split-divider"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSplitMenuLineIdx(splitMenuLineIdx === lineIdx ? null : lineIdx);
+                                        }}
+                                        title="Click to split block here"
+                                    />
+                                    {/* Context menu for split */}
+                                    {splitMenuLineIdx === lineIdx && (
+                                        <div className="split-context-menu">
+                                            <button
+                                                className="split-menu-item"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onSplit(lineIdx, 'text');
+                                                    setSplitMenuLineIdx(null);
+                                                }}
+                                            >
+                                                + Text
+                                            </button>
+                                            <button
+                                                className="split-menu-item"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onSplit(lineIdx, 'analyzed');
+                                                    setSplitMenuLineIdx(null);
+                                                }}
+                                            >
+                                                + Analyzed Text
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))
+                ]
             )}
             {showDebug && (
                 <DebugBlockEditor

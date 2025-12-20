@@ -15,7 +15,7 @@ import { disambiguateVerbs } from './utils/api.js';
 
 // Internal component that uses contexts - Main Reader Content
 function TibetanReaderContent() {
-    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock, splitBlock, mergeBlocks } = useDocument();
+    const { documentData, setDocumentData, loading, isMammothLoaded, setIsMammothLoaded, handleFileUpload, showDebug, setShowDebug, showBlocks, setShowBlocks, rawText, insertRichTextBlock, insertTibetanBlock, deleteBlock, updateRichTextBlock, splitBlock, mergeBlocks } = useDocument();
     const { editingTarget, setEditingTarget } = useEdit();
     const { selectMode, setSelectMode } = useSelection();
     const { user, token, signIn, logout, refreshSession } = useAuth();
@@ -777,26 +777,29 @@ function TibetanReaderContent() {
                                     )}
                                 </>
                             )}
-                            <div className="toolbar-controls-container">
-                                <label className="debug-mode-label">
+                            <div className="header-actions">
+                                <label className="checkbox-container text-sm text-gray-600 mr-4">
                                     <input
                                         type="checkbox"
-                                        checked={selectMode}
-                                        onChange={(e) => setSelectMode(e.target.checked)}
+                                        checked={showBlocks}
+                                        onChange={(e) => setShowBlocks(e.target.checked)}
                                     />
-                                    Select Mode
+                                    Show Blocks
                                 </label>
-                                <label className="debug-mode-label">
+                                <label className="checkbox-container text-sm text-gray-600 mr-4">
                                     <input
                                         type="checkbox"
                                         checked={showDebug}
-                                        onChange={(e) => {
-                                            setShowDebug(e.target.checked);
-                                            setDocumentData(prev => prev.map(b => ({ ...b, _showDebug: false })));
-                                        }}
+                                        onChange={(e) => setShowDebug(e.target.checked)}
                                     />
                                     Debug Mode
                                 </label>
+                                <button onClick={downloadOutput} className="btn-secondary" title="Download Analysis">
+                                    ↓ Export
+                                </button>
+                                <button onClick={() => setShowAnalyzeModal(true)} className="btn-primary">
+                                    Analyze Text
+                                </button>
                             </div>
                         </>
                     )}
@@ -820,16 +823,9 @@ function TibetanReaderContent() {
                                     </div>
                                 </div>
                             )}
-                            {/* Insert controls at beginning of content */}
-                            {documentData.length > 0 && (
-                                <div className="block-insert-controls">
-                                    <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Insert Rich Text Block">+ Text</button>
-                                    <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Insert Tibetan Block">+ Tibetan</button>
-                                    <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Add analyzed text">+ Analyzed Text</button>
-                                </div>
-                            )}
+
                             {documentData.map((block, blockIdx) => (
-                                <div key={blockIdx} className="block-wrapper">
+                                <div key={blockIdx} className={`block-wrapper ${showBlocks ? 'block-visible' : ''}`}>
                                     {/* Render block based on type */}
                                     {block.type === 'richtext' ? (
                                         <RichTextBlock
@@ -859,12 +855,14 @@ function TibetanReaderContent() {
                             ))}
 
                             {/* Append Controls at the very end */}
-                            <div className="block-insert-controls block-insert-controls-end" style={{ marginTop: '20px', justifyContent: 'center', opacity: 1 }}>
-                                <div className="divider-line" style={{ width: '100%', borderTop: '1px dashed #e5e7eb', marginBottom: '10px' }}></div>
-                                <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Append Rich Text Block">+ Text</button>
-                                <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Append Tibetan Block">+ Tibetan</button>
-                                <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Append Analyzed Text">+ Analyzed Text</button>
-                            </div>
+                            {documentData.length > 0 && (
+                                <div className="block-insert-controls block-insert-controls-end" style={{ marginTop: '20px', justifyContent: 'center', opacity: 1 }}>
+                                    <div className="divider-line" style={{ width: '100%', borderTop: '1px dashed #e5e7eb', marginBottom: '10px' }}></div>
+                                    <button onClick={() => insertRichTextBlock(-1)} className="btn-insert-small" title="Append Rich Text Block">+ Text</button>
+                                    <button onClick={() => insertTibetanBlock(-1)} className="btn-insert-small" title="Append Tibetan Block">+ Tibetan</button>
+                                    <button onClick={() => setShowPasteModal(true)} className="btn-insert-small" title="Append Analyzed Text">+ Analyzed Text</button>
+                                </div>
+                            )}
 
                         </>
                     )}
