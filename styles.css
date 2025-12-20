@@ -1498,31 +1498,62 @@ body {
 }
 
 /* Settings Toggles */
+/* Settings Toggles - Filter Chip Style */
 .settings-dropdown-trigger {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
 }
 
 .checkbox-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0.25rem 0.75rem;
+    justify-content: center;
+    padding: 0.375rem 1rem;
     border-radius: 9999px;
     border: 1px solid #d1d5db;
+    /* Default gray border */
+    background-color: #f9fafb;
+    /* Default light gray bg */
+    color: #4b5563;
+    /* Default gray text */
     font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
     user-select: none;
-    transition: all 0.2s;
-    background-color: white;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .checkbox-pill:hover {
+    background-color: #f3f4f6;
     border-color: #9ca3af;
+    color: #374151;
 }
 
+/* Active State using :has() */
+.checkbox-pill:has(input:checked) {
+    background-color: #2563eb;
+    /* Primary Blue */
+    border-color: #2563eb;
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.checkbox-pill:has(input:checked):hover {
+    background-color: #1d4ed8;
+    /* Darker Blue on hover */
+    border-color: #1d4ed8;
+}
+
+/* Hide the actual checkbox input */
 .checkbox-pill input {
-    accent-color: #2563eb;
+    display: none;
+}
+
+/* Ensure label text is centered */
+.checkbox-pill span {
+    line-height: 1;
 }
 
 /* Restored Export Button Styles */
