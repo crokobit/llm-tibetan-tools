@@ -244,6 +244,12 @@ body {
     white-space: nowrap;
 }
 
+.tibetan-text-wrap {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
 .word-card:hover .tibetan-word-box.allow-hover {
     background-color: #eff6ff;
     /* group-hover:bg-blue-50 */
