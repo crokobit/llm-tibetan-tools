@@ -706,103 +706,131 @@ function TibetanReaderContent() {
 
                 {/* Toolbar */}
                 <div className="toolbar-container">
-                    {user && (
-                        <button
-                            onClick={handleOpenCloud}
-                            disabled={isApiBusy}
-                            className={`btn-export toolbar-btn-spacing ${isApiBusy ? 'is-disabled' : ''}`}
-                        >
-                            {isLoadingFiles ? 'Loading...' : 'Open from Cloud'}
-                        </button>
-                    )}
-
-                    {saveFilename ? (
-                        <div className="file-input-custom filename-container">
-                            <span className="current-filename">{saveFilename}</span>
-                        </div>
-                    ) : (
-                        <input
-                            type="file"
-                            accept=".docx,.txt"
-                            onChange={handleFileUpload}
-                            className="file-input-custom"
-                        />
-                    )}
-                    {documentData.length > 0 && (
-                        <>
+                    {/* Left Section - File Management */}
+                    <div className="toolbar-section left">
+                        {user && (
                             <button
-                                onClick={handlePolishVerbs}
+                                onClick={handleOpenCloud}
                                 disabled={isApiBusy}
-                                className={`btn-export toolbar-btn-spacing ${isApiBusy ? 'is-disabled' : ''}`}
-                                title="Link all recognized verbs to the dictionary"
+                                className={`btn-secondary ${isApiBusy ? 'is-disabled' : ''}`}
+                                title="Open a file from the cloud"
                             >
-                                {isPolishing ? 'Polishing...' : 'Polish Verbs'}
+                                📂 Open Cloud
                             </button>
-                            <button
-                                onClick={downloadOutput}
-                                className="btn-export"
-                            >
-                                Export Text
-                            </button>
-                            {user && (
-                                <>
-                                    <button
-                                        onClick={() => saveFilename ? handleSaveCloud() : setShowSaveDialog(true)}
-                                        className={`btn-export ${isApiBusy ? 'is-disabled' : ''}`}
-                                        disabled={isApiBusy}
-                                    >
-                                        {isSaving ? 'Saving...' : (saveFilename ? 'Save' : 'Save to Cloud')}
-                                    </button>
-                                    {saveFilename && (
-                                        <button
-                                            onClick={() => {
-                                                setRenameFilename(saveFilename);
-                                                setRenameNewFilename(saveFilename);
-                                                setShowRenameDialog(true);
-                                            }}
-                                            className="btn-export btn-rename"
-                                            disabled={isApiBusy}
-                                        >
-                                            Rename
-                                        </button>
-                                    )}
-                                    {saveFilename && (
-                                        <button
-                                            onClick={() => handleDeleteCloud(saveFilename)}
-                                            className={`btn-export btn-delete-main ${isApiBusy ? 'is-disabled' : ''}`}
-                                            disabled={isApiBusy}
-                                        >
-                                            Delete
-                                        </button>
-                                    )}
-                                </>
-                            )}
-                            <div className="header-actions">
-                                <label className="checkbox-container text-sm text-gray-600 mr-4">
-                                    <input
-                                        type="checkbox"
-                                        checked={showBlocks}
-                                        onChange={(e) => setShowBlocks(e.target.checked)}
-                                    />
-                                    Show Blocks
-                                </label>
-                                <label className="checkbox-container text-sm text-gray-600 mr-4">
-                                    <input
-                                        type="checkbox"
-                                        checked={showDebug}
-                                        onChange={(e) => setShowDebug(e.target.checked)}
-                                    />
-                                    Debug Mode
-                                </label>
-                                <button onClick={downloadOutput} className="btn-secondary" title="Download Analysis">
-                                    ↓ Export
+                        )}
+
+                        <div className="file-input-wrapper">
+                            <input
+                                id="file-upload"
+                                type="file"
+                                accept=".docx,.txt"
+                                onChange={handleFileUpload}
+                                className="hidden-input"
+                            />
+                            <label htmlFor="file-upload" className="btn-secondary btn-file-label">
+                                📄 Import Local
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Center Section - Core Analysis */}
+                    <div className="toolbar-section center">
+                        {documentData.length > 0 && (
+                            <>
+                                <button
+                                    onClick={handlePolishVerbs}
+                                    disabled={isApiBusy}
+                                    className={`btn-primary ${isApiBusy ? 'is-disabled' : ''}`}
+                                    title="Link all recognized verbs to the dictionary"
+                                >
+                                    {isPolishing ? '✨ Polishing...' : '✨ Polish Verbs'}
                                 </button>
                                 <button onClick={() => setShowAnalyzeModal(true)} className="btn-primary">
-                                    Analyze Text
+                                    🔍 Analyze
                                 </button>
-                            </div>
-                        </>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Filename Display (Flexible Center) */}
+                    {user && saveFilename && (
+                        <div className="filename-display" title={saveFilename}>
+                            {saveFilename}
+                        </div>
                     )}
+
+                    {/* Right Section - Output & Settings */}
+                    <div className="toolbar-section right">
+                        {documentData.length > 0 && (
+                            <>
+
+
+                                {user && (
+                                    <div className="btn-group">
+                                        <button
+                                            onClick={() => saveFilename ? handleSaveCloud() : setShowSaveDialog(true)}
+                                            className={`btn-secondary ${isApiBusy ? 'is-disabled' : ''}`}
+                                            disabled={isApiBusy}
+                                            title="Save to Cloud"
+                                        >
+                                            {isSaving ? 'Saving...' : '💾 Save'}
+                                        </button>
+
+                                        {saveFilename && (
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        setRenameFilename(saveFilename);
+                                                        setRenameNewFilename(saveFilename);
+                                                        setShowRenameDialog(true);
+                                                    }}
+                                                    className="btn-icon"
+                                                    title="Rename File"
+                                                    disabled={isApiBusy}
+                                                >
+                                                    ✏️
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteCloud(saveFilename)}
+                                                    className="btn-icon btn-danger-icon"
+                                                    title="Delete File"
+                                                    disabled={isApiBusy}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="divider-vertical"></div>
+
+                                <button onClick={downloadOutput} className="btn-secondary" title="Export Analysis to Text">
+                                    ⬇️ Export
+                                </button>
+
+                                <div className="settings-dropdown-trigger">
+                                    <label className="checkbox-pill">
+                                        <input
+                                            type="checkbox"
+                                            checked={showBlocks}
+                                            onChange={(e) => setShowBlocks(e.target.checked)}
+                                        />
+                                        <span>Blocks</span>
+                                    </label>
+                                    <label className="checkbox-pill ml-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={showDebug}
+                                            onChange={(e) => setShowDebug(e.target.checked)}
+                                        />
+                                        <span>Debug</span>
+                                    </label>
+                                </div>
+                            </>
+                        )}
+
+                    </div>
                 </div>
 
                 {/* Content Area */}
@@ -867,121 +895,130 @@ function TibetanReaderContent() {
                         </>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Edit Popover */}
             <EditPopover />
 
             {/* Analyze Modal */}
-            <AnalyzeModal
+            < AnalyzeModal
                 isOpen={showAnalyzeModal}
-                onClose={() => setShowAnalyzeModal(false)}
+                onClose={() => setShowAnalyzeModal(false)
+                }
                 onAnalyze={handleAnalyze}
                 isAnalyzing={isAnalyzing}
             />
 
             {/* Paste Modal */}
-            <PasteModal
+            < PasteModal
                 isOpen={showPasteModal}
                 onClose={() => setShowPasteModal(false)}
                 onImport={handlePasteAnalyzed}
             />
 
             {/* Save Dialog */}
-            {showSaveDialog && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h3>Save File</h3>
-                        <input
-                            type="text"
-                            value={saveFilename}
-                            onChange={(e) => setSaveFilename(e.target.value)}
-                            placeholder="Enter filename"
-                            className="modal-input"
-                        />
-                        <div className="modal-actions">
-                            <button onClick={() => setShowSaveDialog(false)} className="btn-cancel" disabled={isApiBusy}>Cancel</button>
-                            <button onClick={handleSaveCloud} className="btn-confirm" disabled={isApiBusy}>
-                                {isSaving ? 'Saving...' : 'Save'}
-                            </button>
+            {
+                showSaveDialog && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <h3>Save File</h3>
+                            <input
+                                type="text"
+                                value={saveFilename}
+                                onChange={(e) => setSaveFilename(e.target.value)}
+                                placeholder="Enter filename"
+                                className="modal-input"
+                            />
+                            <div className="modal-actions">
+                                <button onClick={() => setShowSaveDialog(false)} className="btn-cancel" disabled={isApiBusy}>Cancel</button>
+                                <button onClick={handleSaveCloud} className="btn-confirm" disabled={isApiBusy}>
+                                    {isSaving ? 'Saving...' : 'Save'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
 
             {/* File List Dialog */}
-            {showFileList && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h3>Your Files</h3>
-                        <ul className="file-list">
-                            {userFiles.map(file => (
-                                <li key={file.filename} className={`file-item file-item-container ${isApiBusy ? 'is-disabled' : ''}`}>
-                                    <span onClick={() => !isApiBusy && loadFile(file.filename)} className="file-item-name">
-                                        {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
-                                    </span>
-                                    <div className="file-item-actions">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setRenameFilename(file.filename);
-                                                setRenameNewFilename(file.filename);
-                                                setShowRenameDialog(true);
-                                            }}
-                                            className="btn-export btn-file-action"
-                                            disabled={isApiBusy}
-                                        >
-                                            Rename
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteCloud(file.filename);
-                                            }}
-                                            className="btn-file-delete"
-                                            disabled={isApiBusy}
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                        <button onClick={() => setShowFileList(false)} className="btn-cancel">Close</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Rename Dialog */}
-            {showRenameDialog && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h3>Rename File</h3>
-                        <input
-                            type="text"
-                            value={renameNewFilename}
-                            onChange={(e) => setRenameNewFilename(e.target.value)}
-                            placeholder="Enter new filename"
-                            className="modal-input"
-                        />
-                        <div className="modal-actions">
-                            <button onClick={() => setShowRenameDialog(false)} className="btn-cancel" disabled={isApiBusy}>Cancel</button>
-                            <button onClick={handleRenameCloud} className="btn-confirm" disabled={isApiBusy}>
-                                {isSaving ? 'Renaming...' : 'Rename'}
-                            </button>
+            {
+                showFileList && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <h3>Your Files</h3>
+                            <ul className="file-list">
+                                {userFiles.map(file => (
+                                    <li key={file.filename} className={`file-item file-item-container ${isApiBusy ? 'is-disabled' : ''}`}>
+                                        <span onClick={() => !isApiBusy && loadFile(file.filename)} className="file-item-name">
+                                            {file.filename} {isLoadingFile === file.filename && '(Loading...)'}
+                                        </span>
+                                        <div className="file-item-actions">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setRenameFilename(file.filename);
+                                                    setRenameNewFilename(file.filename);
+                                                    setShowRenameDialog(true);
+                                                }}
+                                                className="btn-export btn-file-action"
+                                                disabled={isApiBusy}
+                                            >
+                                                Rename
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteCloud(file.filename);
+                                                }}
+                                                className="btn-file-delete"
+                                                disabled={isApiBusy}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                            <button onClick={() => setShowFileList(false)} className="btn-cancel">Close</button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Rename Dialog */}
+            {
+                showRenameDialog && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <h3>Rename File</h3>
+                            <input
+                                type="text"
+                                value={renameNewFilename}
+                                onChange={(e) => setRenameNewFilename(e.target.value)}
+                                placeholder="Enter new filename"
+                                className="modal-input"
+                            />
+                            <div className="modal-actions">
+                                <button onClick={() => setShowRenameDialog(false)} className="btn-cancel" disabled={isApiBusy}>Cancel</button>
+                                <button onClick={handleRenameCloud} className="btn-confirm" disabled={isApiBusy}>
+                                    {isSaving ? 'Renaming...' : 'Rename'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             {/* Toast Notification */}
-            {notification && (
-                <div className="toast-notification">
-                    {notification}
-                </div>
-            )}
-        </div>
+            {
+                notification && (
+                    <div className="toast-notification">
+                        {notification}
+                    </div>
+                )
+            }
+        </div >
     );
 }
 
